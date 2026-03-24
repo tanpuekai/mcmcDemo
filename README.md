@@ -10,6 +10,10 @@ This project provides a self-contained, browser-based demonstration of three fun
 - **Gibbs Sampling**: Sequential sampling from conditional distributions
 - **Sequential Monte Carlo (SMC)**: Particle-based sampling with resampling
 
+## Try it out
+
+Click this link: https://htmlpreview.github.io/?https://github.com/tanpuekai/mcmcDemo/blob/main/mcmcDemoCodex.html
+
 ## Features
 
 ### Interactive Visualization
