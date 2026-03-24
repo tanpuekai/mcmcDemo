@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCMC Explorer - Interactive Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --accent-cyan: #00d4ff;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --border-color: #2a2a3a;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr 380px;
+            height: 100vh;
+            gap: 1px;
+            background: var(--border-color);
+        }
+
+        /* Diagnostic Panels Column */
+        .diagnostics-column {
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 15px;
+        }
+
+        .diag-panel {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .diag-panel:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .diag-panel-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 12px;
+            background: linear-gradient(180deg, rgba(10,10,15,0.95) 0%, transparent 100%);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .diag-panel canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .diag-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .diag-panel:hover .diag-hint {
+            opacity: 0.7;
+        }
+
+        /* Main Visualization Area */
+        .viz-area {
+            background: var(--bg-primary);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px 30px;
+            background: linear-gradient(90deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #mainCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .viz-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px 20px;
+            font-size: 0.85rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            margin-bottom: 8px;
+        }
+
+        .stat-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .acceptance-rate { color: var(--accent-green); }
+        .iteration-count { color: var(--accent-cyan); }
+        .particle-count { color: var(--accent-purple); }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .algorithm-tabs {
+            display: flex;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 15px 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tab-btn::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-cyan);
+        }
+
+        .tab-btn.active::before {
+            transform: scaleX(1);
+        }
+
+        .controls-content {
+            padding: 25px;
+            flex: 1;
+        }
+
+        .control-section {
+            margin-bottom: 28px;
+        }
+
+        .control-section h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-section h3::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 2px;
+        }
+
+        /* Playback Controls */
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: white;
+            flex: 1;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        /* Sliders */
+        .slider-container {
+            margin-bottom: 18px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+
+        .slider-label {
+            color: var(--text-secondary);
+        }
+
+        .slider-value {
+            color: var(--accent-cyan);
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        /* Algorithm Info */
+        .algo-info {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .algo-info h4 {
+            color: var(--accent-cyan);
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .algo-info p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .formula {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-pink);
+            border-left: 3px solid var(--accent-pink);
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.target { background: rgba(168, 85, 247, 0.3); border: 2px solid var(--accent-purple); }
+        .legend-dot.current { background: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan); }
+        .legend-dot.proposal { background: var(--accent-orange); }
+        .legend-dot.accepted { background: var(--accent-green); }
+        .legend-dot.rejected { background: var(--accent-pink); }
+        .legend-dot.particle { background: var(--accent-purple); }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .toggle-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: var(--bg-tertiary);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .toggle-switch.active {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        /* Modal for expanded view */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 100%;
+            height: 100%;
+            max-width: 900px;
+            max-height: 700px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.3rem;
+            color: var(--accent-cyan);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .modal-canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #modalCanvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 240px 1fr 340px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+            
+            .diagnostics-column {
+                flex-direction: row;
+                height: 200px;
+                padding: 10px;
+            }
+            
+            .diag-panel {
+                min-height: 180px;
+            }
+            
+            .control-panel {
+                max-height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Diagnostics Column -->
+        <div class="diagnostics-column">
+            <div class="diag-panel" id="targetPanel" title="Double-click to expand">
+                <div class="diag-panel-header">Target Distribution</div>
+                <canvas id="targetCanvas"></canvas>
+                <div class="diag-hint">Double-click to expand</div>
+            </div>
+            <div class="diag-panel" id="sampledPanel" title="Double-click to expand">
+                <div class="diag-panel-header">Sampled Distribution</div>
+                <canvas id="sampledCanvas"></canvas>
+                <div class="diag-hint">Double-click to expand</div>
+            </div>
+            <div class="diag-panel" id="burninPanel" title="Double-click to expand">
+                <div class="diag-panel-header">Trace / Burn-in Analysis</div>
+                <canvas id="burninCanvas"></canvas>
+                <div class="diag-hint">Double-click to expand</div>
+            </div>
+        </div>
+
+        <!-- Main Visualization Area -->
+        <div class="viz-area">
+            <div class="header">
+                <h1>🔬 MCMC Explorer</h1>
+                <p>Interactive Markov Chain Monte Carlo visualization for understanding sampling algorithms</p>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px; opacity: 0.7;">Conceived and designed by Peikai Chen, executed by AI.</p>
+            </div>
+            <div class="canvas-container">
+                <canvas id="mainCanvas"></canvas>
+                <div class="viz-overlay">
+                    <div class="stat-row">
+                        <span class="stat-label">Iteration</span>
+                        <span class="stat-value iteration-count" id="iterCount">0</span>
+                    </div>
+                    <div class="stat-row" id="acceptanceRow">
+                        <span class="stat-label">Acceptance Rate</span>
+                        <span class="stat-value acceptance-rate" id="acceptRate">0%</span>
+                    </div>
+                    <div class="stat-row" id="particleRow" style="display: none;">
+                        <span class="stat-label">Active Particles</span>
+                        <span class="stat-value particle-count" id="particleCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Algorithm Tabs -->
+            <div class="algorithm-tabs">
+                <button class="tab-btn active" data-algo="mh">Metropolis-Hastings</button>
+                <button class="tab-btn" data-algo="gibbs">Gibbs Sampling</button>
+                <button class="tab-btn" data-algo="smc">Sequential MC</button>
+            </div>
+
+            <div class="controls-content">
+                <!-- Playback Controls -->
+                <div class="control-section">
+                    <h3>Playback</h3>
+                    <div class="playback-controls">
+                        <button class="btn btn-primary" id="playBtn">
+                            <span>▶</span> Start
+                        </button>
+                        <button class="btn btn-secondary" id="resetBtn">
+                            <span>↺</span> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Speed Control -->
+                <div class="control-section">
+                    <h3>Speed (points/sec)</h3>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Sampling Rate</span>
+                            <span class="slider-value" id="speedValue">1</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="20" value="1" step="1">
+                    </div>
+                </div>
+
+                <!-- Visualization Options -->
+                <div class="control-section">
+                    <h3>Visualization</h3>
+                    <div class="toggle-container">
+                        <span class="toggle-label">Show Transition Traces</span>
+                        <div class="toggle-switch active" id="traceToggle"></div>
+                    </div>
+                    <div class="toggle-container">
+                        <span class="toggle-label">Show Proposal Dist</span>
+                        <div class="toggle-switch active" id="proposalToggle"></div>
+                    </div>
+                </div>
+
+                <!-- Algorithm Parameters -->
+                <div class="control-section" id="mh-params">
+                    <h3>MH Parameters</h3>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Proposal σ (Step Size)</span>
+                            <span class="slider-value" id="sigmaValue">0.5</span>
+                        </div>
+                        <input type="range" id="sigmaSlider" min="0.1" max="2.0" step="0.1" value="0.5">
+                    </div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Target Separation</span>
+                            <span class="slider-value" id="sepValue">4.0</span>
+                        </div>
+                        <input type="range" id="sepSlider" min="0" max="6" step="0.5" value="4">
+                    </div>
+                </div>
+
+                <div class="control-section" id="gibbs-params" style="display: none;">
+                    <h3>Gibbs Parameters</h3>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Correlation (ρ)</span>
+                            <span class="slider-value" id="rhoValue">0.8</span>
+                        </div>
+                        <input type="range" id="rhoSlider" min="0" max="0.95" step="0.05" value="0.8">
+                    </div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Conditional Var</span>
+                            <span class="slider-value" id="condVarValue">0.5</span>
+                        </div>
+                        <input type="range" id="condVarSlider" min="0.1" max="1.0" step="0.1" value="0.5">
+                    </div>
+                </div>
+
+                <div class="control-section" id="smc-params" style="display: none;">
+                    <h3>SMC Parameters</h3>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Num Particles</span>
+                            <span class="slider-value" id="nParticlesValue">100</span>
+                        </div>
+                        <input type="range" id="nParticlesSlider" min="20" max="300" step="10" value="100">
+                    </div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Resample Threshold</span>
+                            <span class="slider-value" id="resampleValue">0.5</span>
+                        </div>
+                        <input type="range" id="resampleSlider" min="0.1" max="1.0" step="0.1" value="0.5">
+                    </div>
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span class="slider-label">Tempering Rate</span>
+                            <span class="slider-value" id="temperValue">0.02</span>
+                        </div>
+                        <input type="range" id="temperSlider" min="0.01" max="0.1" step="0.01" value="0.02">
+                    </div>
+                </div>
+
+                <!-- Algorithm Info -->
+                <div class="control-section">
+                    <h3>About</h3>
+                    <div class="algo-info" id="mh-info">
+                        <h4>Metropolis-Hastings</h4>
+                        <p>A random walk algorithm that proposes new states and accepts/rejects them based on the target distribution ratio.</p>
+                        <div class="formula">
+                            α = min(1, π(x')/π(x) · q(x|x')/q(x'|x))
+                        </div>
+                    </div>
+                    <div class="algo-info" id="gibbs-info" style="display: none;">
+                        <h4>Gibbs Sampling</h4>
+                        <p>Sequentially samples from conditional distributions. Each variable is updated given the current values of all others.</p>
+                        <div class="formula">
+                            xᵢ⁽ᵗ⁺¹⁾ ~ p(xᵢ | x₁⁽ᵗ⁺¹⁾,...,xᵢ₋₁⁽ᵗ⁺¹⁾,xᵢ₊₁⁽ᵗ⁾,...)
+                        </div>
+                    </div>
+                    <div class="algo-info" id="smc-info" style="display: none;">
+                        <h4>Sequential Monte Carlo</h4>
+                        <p>Maintains a population of particles that evolve, are weighted by likelihood, and resampled according to weights.</p>
+                        <div class="formula">
+                            wᵢ ∝ p(y|xᵢ), Resample if ESS &lt; threshold
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="control-section">
+                    <h3>Legend</h3>
+                    <div class="legend" id="mh-legend">
+                        <div class="legend-item">
+                            <div class="legend-dot target"></div>
+                            <span>Target Distribution</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot current"></div>
+                            <span>Current State</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot proposal"></div>
+                            <span>Proposal</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot accepted"></div>
+                            <span>Accepted</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot rejected"></div>
+                            <span>Rejected</span>
+                        </div>
+                    </div>
+                    <div class="legend" id="gibbs-legend" style="display: none;">
+                        <div class="legend-item">
+                            <div class="legend-dot target"></div>
+                            <span>Joint Distribution</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot current"></div>
+                            <span>Current Point</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot accepted"></div>
+                            <span>X Update</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot proposal"></div>
+                            <span>Y Update</span>
+                        </div>
+                    </div>
+                    <div class="legend" id="smc-legend" style="display: none;">
+                        <div class="legend-item">
+                            <div class="legend-dot target"></div>
+                            <span>Target Region</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot particle"></div>
+                            <span>Particle</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-dot current"></div>
+                            <span>High Weight</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for expanded diagnostic view -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Distribution View</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-canvas-container">
+                <canvas id="modalCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // MCMC Explorer - Main JavaScript
+        // ============================================
+
+        // Canvas elements
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const targetCanvas = document.getElementById('targetCanvas');
+        const targetCtx = targetCanvas.getContext('2d');
+        
+        const sampledCanvas = document.getElementById('sampledCanvas');
+        const sampledCtx = sampledCanvas.getContext('2d');
+        
+        const burninCanvas = document.getElementById('burninCanvas');
+        const burninCtx = burninCanvas.getContext('2d');
+
+        const modalCanvas = document.getElementById('modalCanvas');
+        const modalCtx = modalCanvas.getContext('2d');
+
+        // State
+        let currentAlgo = 'mh';
+        let isRunning = false;
+        let animationId = null;
+        let iteration = 0;
+        let acceptedCount = 0;
+        let lastStepTime = 0;
+
+        // Sample storage for diagnostics
+        let allSamples = [];
+        let traceHistory = []; // For burn-in plot
+        const MAX_TRACE_HISTORY = 500;
+        const MAX_STORED_SAMPLES = 5000;
+
+        // Settings
+        let settings = {
+            speed: 1, // points per second
+            showTraces: true,
+            showProposal: true,
+            // MH params
+            proposalSigma: 0.5,
+            targetSeparation: 4,
+            // Gibbs params
+            gibbsRho: 0.8,
+            gibbsCondVar: 0.5,
+            // SMC params
+            nParticles: 100,
+            resampleThreshold: 0.5,
+            temperingRate: 0.02
+        };
+
+        // Trail history for main visualization
+        let trail = [];
+        const MAX_TRAIL_LENGTH = 100;
+
+        // Particle system for SMC
+        let particles = [];
+        let smcTemperature = 0;
+
+        // Current state
+        let currentState = { x: 0, y: 0 };
+        let proposalState = null;
+        let lastUpdateAxis = 'x'; // For Gibbs
+
+        // Modal state
+        let expandedPanel = null;
+
+        // ============================================
+        // Math Utilities
+        // ============================================
+
+        function randn() {
+            // Box-Muller transform
+            const u1 = Math.random();
+            const u2 = Math.random();
+            return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        }
+
+        function targetDensity(x, y) {
+            // Mixture of two Gaussians
+            const sep = settings.targetSeparation;
+            const g1 = Math.exp(-((x - sep/2)**2 + y**2) / 2) / (2 * Math.PI);
+            const g2 = Math.exp(-((x + sep/2)**2 + y**2) / 2) / (2 * Math.PI);
+            return 0.5 * g1 + 0.5 * g2;
+        }
+
+        function gibbsTargetDensity(x, y) {
+            // Bivariate Gaussian with correlation
+            const rho = settings.gibbsRho;
+            const z = (x**2 - 2*rho*x*y + y**2) / (1 - rho**2);
+            return Math.exp(-z / 2) / (2 * Math.PI * Math.sqrt(1 - rho**2));
+        }
+
+        // ============================================
+        // Coordinate Transformations
+        // ============================================
+
+        function worldToScreen(x, y, width, height) {
+            const padding = 30;
+            const availableWidth = width - 2 * padding;
+            const availableHeight = height - 2 * padding;
+            const scale = Math.min(availableWidth, availableHeight) / 12;
+            
+            return {
+                x: width / 2 + x * scale,
+                y: height / 2 - y * scale
+            };
+        }
+
+        function screenToWorld(sx, sy, width, height) {
+            const padding = 30;
+            const availableWidth = width - 2 * padding;
+            const availableHeight = height - 2 * padding;
+            const scale = Math.min(availableWidth, availableHeight) / 12;
+            
+            return {
+                x: (sx - width / 2) / scale,
+                y: -(sy - height / 2) / scale
+            };
+        }
+
+        // ============================================
+        // Drawing Functions
+        // ============================================
+
+        function resizeCanvas(canvas) {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        function drawHeatmap(ctx, width, height, densityFn, colormap) {
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+
+            for (let py = 0; py < height; py += 2) {
+                for (let px = 0; px < width; px += 2) {
+                    const world = screenToWorld(px, py, width, height);
+                    const density = densityFn(world.x, world.y);
+                    const intensity = Math.min(255, density * 1500);
+                    
+                    for (let dy = 0; dy < 2 && py + dy < height; dy++) {
+                        for (let dx = 0; dx < 2 && px + dx < width; dx++) {
+                            const idx = ((py + dy) * width + (px + dx)) * 4;
+                            if (colormap === 'purple') {
+                                data[idx] = 168;
+                                data[idx + 1] = 85;
+                                data[idx + 2] = 247;
+                            } else if (colormap === 'cyan') {
+                                data[idx] = 0;
+                                data[idx + 1] = 212;
+                                data[idx + 2] = 255;
+                            } else {
+                                data[idx] = 16;
+                                data[idx + 1] = 185;
+                                data[idx + 2] = 129;
+                            }
+                            data[idx + 3] = intensity * 0.6;
+                        }
+                    }
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function drawSampledDistribution(ctx, width, height) {
+            // Clear canvas
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, width, height);
+
+            if (allSamples.length < 10) {
+                ctx.fillStyle = '#a0a0b0';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Collecting samples...', width/2, height/2);
+                return;
+            }
+
+            // Create 2D histogram
+            const bins = 40;
+            const histogram = new Array(bins * bins).fill(0);
+            let maxCount = 0;
+
+            allSamples.forEach(s => {
+                const bx = Math.floor((s.x + 6) / 12 * bins);
+                const by = Math.floor((s.y + 6) / 12 * bins);
+                if (bx >= 0 && bx < bins && by >= 0 && by < bins) {
+                    histogram[by * bins + bx]++;
+                    maxCount = Math.max(maxCount, histogram[by * bins + bx]);
+                }
+            });
+
+            // Draw heatmap
+            const cellW = width / bins;
+            const cellH = height / bins;
+
+            for (let by = 0; by < bins; by++) {
+                for (let bx = 0; bx < bins; bx++) {
+                    const count = histogram[by * bins + bx];
+                    const intensity = count / maxCount;
+                    
+                    const r = Math.floor(0 + intensity * 0);
+                    const g = Math.floor(100 + intensity * 155);
+                    const b = Math.floor(150 + intensity * 105);
+                    
+                    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.2 + intensity * 0.8})`;
+                    ctx.fillRect(bx * cellW, (bins - 1 - by) * cellH, cellW + 1, cellH + 1);
+                }
+            }
+
+            // Draw sample points
+            ctx.fillStyle = 'rgba(0, 212, 255, 0.4)';
+            allSamples.slice(-200).forEach(s => {
+                const p = worldToScreen(s.x, s.y, width, height);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawBurninPlot(ctx, width, height) {
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, width, height);
+
+            if (traceHistory.length < 2) {
+                ctx.fillStyle = '#a0a0b0';
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Waiting for samples...', width/2, height/2);
+                return;
+            }
+
+            const padding = 30;
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
+
+            // Find ranges
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            traceHistory.forEach(s => {
+                minX = Math.min(minX, s.iter);
+                maxX = Math.max(maxX, s.iter);
+                minY = Math.min(minY, s.x, s.y);
+                maxY = Math.max(maxY, s.x, s.y);
+            });
+            
+            // Add some margin
+            const rangeY = maxY - minY || 1;
+            minY -= rangeY * 0.1;
+            maxY += rangeY * 0.1;
+
+            // Draw axes
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            // Draw X trace
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            traceHistory.forEach((s, i) => {
+                const px = padding + (s.iter - minX) / (maxX - minX) * plotWidth;
+                const py = height - padding - (s.x - minY) / (maxY - minY) * plotHeight;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            });
+            ctx.stroke();
+
+            // Draw Y trace
+            ctx.strokeStyle = '#ec4899';
+            ctx.beginPath();
+            traceHistory.forEach((s, i) => {
+                const px = padding + (s.iter - minX) / (maxX - minX) * plotWidth;
+                const py = height - padding - (s.y - minY) / (maxY - minY) * plotHeight;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            });
+            ctx.stroke();
+
+            // Draw burn-in indicator (first 20%)
+            const burninEnd = padding + (maxX - minX) * 0.2 / (maxX - minX) * plotWidth;
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+            ctx.fillRect(padding, padding, burninEnd - padding, plotHeight);
+
+            // Legend
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#00d4ff';
+            ctx.fillText('X', width - 50, 20);
+            ctx.fillStyle = '#ec4899';
+            ctx.fillText('Y', width - 30, 20);
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
+            ctx.fillText('Burn-in', padding + 10, 20);
+        }
+
+        function drawGrid(ctx, width, height) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            const gridSize = 30;
+            for (let x = 0; x < width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawAxes(ctx, width, height) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 2;
+            const origin = worldToScreen(0, 0, width, height);
+            ctx.beginPath();
+            ctx.moveTo(origin.x, 0);
+            ctx.lineTo(origin.x, height);
+            ctx.moveTo(0, origin.y);
+            ctx.lineTo(width, origin.y);
+            ctx.stroke();
+        }
+
+        // ============================================
+        // Main Visualization Functions
+        // ============================================
+
+        function drawMainTraces() {
+            if (!settings.showTraces || trail.length < 2) return;
+
+            for (let i = 1; i < trail.length; i++) {
+                const p1 = worldToScreen(trail[i - 1].x, trail[i - 1].y, canvas.width, canvas.height);
+                const p2 = worldToScreen(trail[i].x, trail[i].y, canvas.width, canvas.height);
+                const alpha = (i / trail.length) * 0.8;
+                
+                let color;
+                if (trail[i].type === 'accepted') {
+                    color = `rgba(16, 185, 129, ${alpha})`;
+                } else if (trail[i].type === 'rejected') {
+                    color = `rgba(236, 72, 153, ${alpha})`;
+                } else if (trail[i].type === 'x-update') {
+                    color = `rgba(16, 185, 129, ${alpha})`;
+                } else if (trail[i].type === 'y-update') {
+                    color = `rgba(245, 158, 11, ${alpha})`;
+                } else {
+                    color = `rgba(0, 212, 255, ${alpha})`;
+                }
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+
+                if (i > trail.length - 10) {
+                    ctx.shadowColor = color;
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            }
+        }
+
+        function drawProposal() {
+            if (!settings.showProposal || currentAlgo !== 'mh' || !proposalState) return;
+
+            const center = worldToScreen(currentState.x, currentState.y, canvas.width, canvas.height);
+            const sigma = settings.proposalSigma;
+            const scale = Math.min(canvas.width, canvas.height) / 12;
+            const radius = sigma * scale;
+
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const prop = worldToScreen(proposalState.x, proposalState.y, canvas.width, canvas.height);
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(prop.x, prop.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(center.x, center.y);
+            ctx.lineTo(prop.x, prop.y);
+            ctx.stroke();
+        }
+
+        function drawCurrentState() {
+            if (currentAlgo === 'smc') return;
+            
+            const p = worldToScreen(currentState.x, currentState.y, canvas.width, canvas.height);
+            
+            const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 20);
+            gradient.addColorStop(0, 'rgba(0, 212, 255, 0.8)');
+            gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#00d4ff';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawParticles() {
+            particles.forEach(p => {
+                const pos = worldToScreen(p.x, p.y, canvas.width, canvas.height);
+                const size = 2 + p.weight * 8;
+                const alpha = 0.3 + p.weight * 0.7;
+
+                const r = Math.floor(168 - p.weight * 100);
+                const g = Math.floor(85 + p.weight * 100);
+                const b = 247;
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (settings.showTraces && p.history && p.history.length > 1) {
+                    ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.3})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const start = worldToScreen(p.history[0].x, p.history[0].y, canvas.width, canvas.height);
+                    ctx.moveTo(start.x, start.y);
+                    for (let i = 1; i < p.history.length; i++) {
+                        const hp = worldToScreen(p.history[i].x, p.history[i].y, canvas.width, canvas.height);
+                        ctx.lineTo(hp.x, hp.y);
+                    }
+                    ctx.stroke();
+                }
+            });
+
+            if (particles.length > 0) {
+                let wx = 0, wy = 0;
+                particles.forEach(p => {
+                    wx += p.x * p.weight;
+                    wy += p.y * p.weight;
+                });
+                const mean = worldToScreen(wx, wy, canvas.width, canvas.height);
+                ctx.fillStyle = '#00d4ff';
+                ctx.beginPath();
+                ctx.arc(mean.x, mean.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowColor = '#00d4ff';
+                ctx.shadowBlur = 20;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function renderMain() {
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid(ctx, canvas.width, canvas.height);
+            drawAxes(ctx, canvas.width, canvas.height);
+
+            if (currentAlgo === 'smc') {
+                drawParticles();
+            } else {
+                drawMainTraces();
+                drawProposal();
+                drawCurrentState();
+            }
+        }
+
+        function renderDiagnostics() {
+            // Target distribution
+            targetCtx.fillStyle = '#0a0a0f';
+            targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+            
+            if (currentAlgo === 'gibbs') {
+                drawHeatmap(targetCtx, targetCanvas.width, targetCanvas.height, gibbsTargetDensity, 'purple');
+            } else {
+                drawHeatmap(targetCtx, targetCanvas.width, targetCanvas.height, targetDensity, 'purple');
+            }
+            drawAxes(targetCtx, targetCanvas.width, targetCanvas.height);
+
+            // Sampled distribution
+            drawSampledDistribution(sampledCtx, sampledCanvas.width, sampledCanvas.height);
+            drawAxes(sampledCtx, sampledCanvas.width, sampledCanvas.height);
+
+            // Burn-in plot
+            drawBurninPlot(burninCtx, burninCanvas.width, burninCanvas.height);
+        }
+
+        // ============================================
+        // MCMC Algorithms
+        // ============================================
+
+        function stepMetropolisHastings() {
+            const proposalX = currentState.x + settings.proposalSigma * randn();
+            const proposalY = currentState.y + settings.proposalSigma * randn();
+            
+            proposalState = { x: proposalX, y: proposalY };
+
+            const currentDensity = targetDensity(currentState.x, currentState.y);
+            const proposalDensity = targetDensity(proposalX, proposalY);
+            const alpha = Math.min(1, proposalDensity / currentDensity);
+
+            const accepted = Math.random() < alpha;
+            
+            trail.push({
+                x: currentState.x,
+                y: currentState.y,
+                type: accepted ? 'accepted' : 'rejected'
+            });
+
+            if (trail.length > MAX_TRAIL_LENGTH) trail.shift();
+
+            if (accepted) {
+                currentState = { x: proposalX, y: proposalY };
+                acceptedCount++;
+            }
+
+            // Store sample
+            allSamples.push({...currentState});
+            if (allSamples.length > MAX_STORED_SAMPLES) allSamples.shift();
+
+            // Store for trace
+            traceHistory.push({ iter: iteration, x: currentState.x, y: currentState.y });
+            if (traceHistory.length > MAX_TRACE_HISTORY) traceHistory.shift();
+
+            iteration++;
+            updateStats();
+        }
+
+        function stepGibbs() {
+            const rho = settings.gibbsRho;
+            const condVar = settings.gibbsCondVar * (1 - rho**2);
+            const condStd = Math.sqrt(condVar);
+
+            if (lastUpdateAxis === 'x') {
+                const mean = rho * currentState.y;
+                currentState.x = mean + condStd * randn();
+                lastUpdateAxis = 'y';
+                trail.push({ x: currentState.x, y: currentState.y, type: 'x-update' });
+            } else {
+                const mean = rho * currentState.x;
+                currentState.y = mean + condStd * randn();
+                lastUpdateAxis = 'x';
+                trail.push({ x: currentState.x, y: currentState.y, type: 'y-update' });
+            }
+
+            if (trail.length > MAX_TRAIL_LENGTH) trail.shift();
+
+            allSamples.push({...currentState});
+            if (allSamples.length > MAX_STORED_SAMPLES) allSamples.shift();
+
+            traceHistory.push({ iter: iteration, x: currentState.x, y: currentState.y });
+            if (traceHistory.length > MAX_TRACE_HISTORY) traceHistory.shift();
+
+            iteration++;
+            updateStats();
+        }
+
+        function stepSMC() {
+            smcTemperature += settings.temperingRate;
+            if (smcTemperature > 1) smcTemperature = 1;
+
+            particles.forEach(p => {
+                const sep = settings.targetSeparation;
+                const g1Dist = Math.sqrt((p.x - sep/2)**2 + p.y**2);
+                const g2Dist = Math.sqrt((p.x + sep/2)**2 + p.y**2);
+                
+                let driftX, driftY;
+                if (g1Dist < g2Dist) {
+                    driftX = (sep/2 - p.x) * 0.1;
+                    driftY = -p.y * 0.1;
+                } else {
+                    driftX = (-sep/2 - p.x) * 0.1;
+                    driftY = -p.y * 0.1;
+                }
+
+                p.x += driftX + 0.3 * randn();
+                p.y += driftY + 0.3 * randn();
+
+                if (!p.history) p.history = [];
+                p.history.push({ x: p.x, y: p.y });
+                if (p.history.length > 20) p.history.shift();
+
+                const density = targetDensity(p.x, p.y);
+                p.weight *= density * 10 + 0.01;
+            });
+
+            const totalWeight = particles.reduce((sum, p) => sum + p.weight, 0);
+            particles.forEach(p => p.weight /= totalWeight);
+
+            const ess = 1 / particles.reduce((sum, p) => sum + p.weight**2, 0);
+            const essRatio = ess / particles.length;
+
+            if (essRatio < settings.resampleThreshold) {
+                const newParticles = [];
+                const n = particles.length;
+                let cumSum = 0;
+                let u = Math.random() / n;
+                let j = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    cumSum += particles[i].weight;
+                    while (u < cumSum && j < n) {
+                        newParticles.push({
+                            x: particles[i].x + 0.1 * randn(),
+                            y: particles[i].y + 0.1 * randn(),
+                            weight: 1 / n,
+                            history: []
+                        });
+                        u += 1 / n;
+                        j++;
+                    }
+                }
+                
+                while (newParticles.length < n) {
+                    const parent = particles[Math.floor(Math.random() * n)];
+                    newParticles.push({
+                        x: parent.x + 0.1 * randn(),
+                        y: parent.y + 0.1 * randn(),
+                        weight: 1 / n,
+                        history: []
+                    });
+                }
+                
+                particles = newParticles;
+            }
+
+            // Store particle mean for diagnostics
+            let wx = 0, wy = 0;
+            particles.forEach(p => {
+                wx += p.x * p.weight;
+                wy += p.y * p.weight;
+            });
+            
+            allSamples.push({ x: wx, y: wy });
+            if (allSamples.length > MAX_STORED_SAMPLES) allSamples.shift();
+
+            traceHistory.push({ iter: iteration, x: wx, y: wy });
+            if (traceHistory.length > MAX_TRACE_HISTORY) traceHistory.shift();
+
+            iteration++;
+            updateStats();
+        }
+
+        function step() {
+            switch (currentAlgo) {
+                case 'mh': stepMetropolisHastings(); break;
+                case 'gibbs': stepGibbs(); break;
+                case 'smc': stepSMC(); break;
+            }
+        }
+
+        // ============================================
+        // Animation Loop (time-based)
+        // ============================================
+
+        function animate(timestamp) {
+            if (!isRunning) return;
+
+            const deltaTime = timestamp - lastStepTime;
+            const interval = 1000 / settings.speed; // ms per point
+
+            if (deltaTime >= interval) {
+                step();
+                lastStepTime = timestamp;
+            }
+
+            renderMain();
+            renderDiagnostics();
+            
+            // Also render modal if open
+            if (expandedPanel) {
+                renderModal();
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function renderModal() {
+            modalCtx.fillStyle = '#0a0a0f';
+            modalCtx.fillRect(0, 0, modalCanvas.width, modalCanvas.height);
+
+            if (expandedPanel === 'target') {
+                if (currentAlgo === 'gibbs') {
+                    drawHeatmap(modalCtx, modalCanvas.width, modalCanvas.height, gibbsTargetDensity, 'purple');
+                } else {
+                    drawHeatmap(modalCtx, modalCanvas.width, modalCanvas.height, targetDensity, 'purple');
+                }
+                drawAxes(modalCtx, modalCanvas.width, modalCanvas.height);
+            } else if (expandedPanel === 'sampled') {
+                drawSampledDistribution(modalCtx, modalCanvas.width, modalCanvas.height);
+                drawAxes(modalCtx, modalCanvas.width, modalCanvas.height);
+            } else if (expandedPanel === 'burnin') {
+                drawBurninPlot(modalCtx, modalCanvas.width, modalCanvas.height);
+            }
+        }
+
+        // ============================================
+        // UI Updates
+        // ============================================
+
+        function updateStats() {
+            document.getElementById('iterCount').textContent = iteration;
+            
+            if (currentAlgo === 'mh') {
+                const rate = iteration > 0 ? (acceptedCount / iteration * 100).toFixed(1) : 0;
+                document.getElementById('acceptRate').textContent = rate + '%';
+                document.getElementById('acceptanceRow').style.display = 'flex';
+                document.getElementById('particleRow').style.display = 'none';
+            } else if (currentAlgo === 'smc') {
+                document.getElementById('particleCount').textContent = particles.length;
+                document.getElementById('acceptanceRow').style.display = 'none';
+                document.getElementById('particleRow').style.display = 'flex';
+            } else {
+                document.getElementById('acceptanceRow').style.display = 'none';
+                document.getElementById('particleRow').style.display = 'none';
+            }
+        }
+
+        function reset() {
+            iteration = 0;
+            acceptedCount = 0;
+            trail = [];
+            allSamples = [];
+            traceHistory = [];
+            smcTemperature = 0;
+            proposalState = null;
+            lastUpdateAxis = 'x';
+            lastStepTime = 0;
+            
+            if (currentAlgo === 'smc') {
+                particles = [];
+                for (let i = 0; i < settings.nParticles; i++) {
+                    particles.push({
+                        x: randn() * 3,
+                        y: randn() * 3,
+                        weight: 1 / settings.nParticles,
+                        history: [{ x: randn() * 3, y: randn() * 3 }]
+                    });
+                }
+            } else {
+                currentState = { x: randn() * 2, y: randn() * 2 };
+            }
+            
+            updateStats();
+            renderMain();
+            renderDiagnostics();
+        }
+
+        function switchAlgorithm(algo) {
+            currentAlgo = algo;
+            isRunning = false;
+            document.getElementById('playBtn').innerHTML = '<span>▶</span> Start';
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.algo === algo);
+            });
+
+            document.getElementById('mh-params').style.display = algo === 'mh' ? 'block' : 'none';
+            document.getElementById('gibbs-params').style.display = algo === 'gibbs' ? 'block' : 'none';
+            document.getElementById('smc-params').style.display = algo === 'smc' ? 'block' : 'none';
+            
+            document.getElementById('mh-info').style.display = algo === 'mh' ? 'block' : 'none';
+            document.getElementById('gibbs-info').style.display = algo === 'gibbs' ? 'block' : 'none';
+            document.getElementById('smc-info').style.display = algo === 'smc' ? 'block' : 'none';
+            
+            document.getElementById('mh-legend').style.display = algo === 'mh' ? 'flex' : 'none';
+            document.getElementById('gibbs-legend').style.display = algo === 'gibbs' ? 'flex' : 'none';
+            document.getElementById('smc-legend').style.display = algo === 'smc' ? 'flex' : 'none';
+
+            reset();
+        }
+
+        // ============================================
+        // Event Listeners
+        // ============================================
+
+        // Algorithm tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchAlgorithm(btn.dataset.algo));
+        });
+
+        // Playback controls
+        document.getElementById('playBtn').addEventListener('click', () => {
+            isRunning = !isRunning;
+            document.getElementById('playBtn').innerHTML = isRunning ? 
+                '<span>⏸</span> Pause' : '<span>▶</span> Resume';
+            if (isRunning) {
+                lastStepTime = performance.now();
+                requestAnimationFrame(animate);
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            document.getElementById('playBtn').innerHTML = '<span>▶</span> Start';
+            reset();
+        });
+
+        // Speed slider - now in points per second
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            settings.speed = parseInt(e.target.value);
+            document.getElementById('speedValue').textContent = settings.speed;
+        });
+
+        // Toggles
+        document.getElementById('traceToggle').addEventListener('click', function() {
+            settings.showTraces = !settings.showTraces;
+            this.classList.toggle('active', settings.showTraces);
+            renderMain();
+        });
+
+        document.getElementById('proposalToggle').addEventListener('click', function() {
+            settings.showProposal = !settings.showProposal;
+            this.classList.toggle('active', settings.showProposal);
+            renderMain();
+        });
+
+        // MH parameters
+        document.getElementById('sigmaSlider').addEventListener('input', (e) => {
+            settings.proposalSigma = parseFloat(e.target.value);
+            document.getElementById('sigmaValue').textContent = settings.proposalSigma;
+        });
+
+        document.getElementById('sepSlider').addEventListener('input', (e) => {
+            settings.targetSeparation = parseFloat(e.target.value);
+            document.getElementById('sepValue').textContent = settings.targetSeparation;
+            renderMain();
+            renderDiagnostics();
+        });
+
+        // Gibbs parameters
+        document.getElementById('rhoSlider').addEventListener('input', (e) => {
+            settings.gibbsRho = parseFloat(e.target.value);
+            document.getElementById('rhoValue').textContent = settings.gibbsRho;
+            renderMain();
+            renderDiagnostics();
+        });
+
+        document.getElementById('condVarSlider').addEventListener('input', (e) => {
+            settings.gibbsCondVar = parseFloat(e.target.value);
+            document.getElementById('condVarValue').textContent = settings.gibbsCondVar;
+        });
+
+        // SMC parameters
+        document.getElementById('nParticlesSlider').addEventListener('input', (e) => {
+            settings.nParticles = parseInt(e.target.value);
+            document.getElementById('nParticlesValue').textContent = settings.nParticles;
+            if (currentAlgo === 'smc') reset();
+        });
+
+        document.getElementById('resampleSlider').addEventListener('input', (e) => {
+            settings.resampleThreshold = parseFloat(e.target.value);
+            document.getElementById('resampleValue').textContent = settings.resampleThreshold;
+        });
+
+        document.getElementById('temperSlider').addEventListener('input', (e) => {
+            settings.temperingRate = parseFloat(e.target.value);
+            document.getElementById('temperValue').textContent = settings.temperingRate;
+        });
+
+        // Diagnostic panel double-click to expand
+        document.getElementById('targetPanel').addEventListener('dblclick', () => {
+            expandedPanel = 'target';
+            document.getElementById('modalTitle').textContent = 'Target Distribution (Theoretical)';
+            document.getElementById('modalOverlay').classList.add('active');
+            resizeCanvas(modalCanvas);
+            renderModal();
+        });
+
+        document.getElementById('sampledPanel').addEventListener('dblclick', () => {
+            expandedPanel = 'sampled';
+            document.getElementById('modalTitle').textContent = 'Sampled Distribution (Empirical)';
+            document.getElementById('modalOverlay').classList.add('active');
+            resizeCanvas(modalCanvas);
+            renderModal();
+        });
+
+        document.getElementById('burninPanel').addEventListener('dblclick', () => {
+            expandedPanel = 'burnin';
+            document.getElementById('modalTitle').textContent = 'Trace & Burn-in Analysis';
+            document.getElementById('modalOverlay').classList.add('active');
+            resizeCanvas(modalCanvas);
+            renderModal();
+        });
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            expandedPanel = null;
+            document.getElementById('modalOverlay').classList.remove('active');
+        });
+
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('modalOverlay')) {
+                expandedPanel = null;
+                document.getElementById('modalOverlay').classList.remove('active');
+            }
+        });
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            resizeCanvas(canvas);
+            resizeCanvas(targetCanvas);
+            resizeCanvas(sampledCanvas);
+            resizeCanvas(burninCanvas);
+            renderMain();
+            renderDiagnostics();
+        });
+
+        // ============================================
+        // Initialization
+        // ============================================
+
+        function initCanvases() {
+            resizeCanvas(canvas);
+            resizeCanvas(targetCanvas);
+            resizeCanvas(sampledCanvas);
+            resizeCanvas(burninCanvas);
+            reset();
+            renderMain();
+            renderDiagnostics();
+        }
+
+        // Initialize immediately and after a short delay to ensure proper layout
+        initCanvases();
+        window.addEventListener('load', initCanvases);
+        setTimeout(initCanvases, 100);
+    </script>
+</body>
+</html>
