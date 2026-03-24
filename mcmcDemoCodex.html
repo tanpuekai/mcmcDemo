@@ -1,0 +1,2189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCMC Teaching Lab</title>
+    <style>
+        :root {
+            --bg: #f5efe2;
+            --bg-alt: #fffaf1;
+            --panel: rgba(255, 250, 241, 0.9);
+            --panel-strong: rgba(255, 247, 232, 0.97);
+            --ink: #1f1b16;
+            --muted: #6f675d;
+            --line: rgba(77, 62, 44, 0.15);
+            --accent: #cb5a2e;
+            --accent-soft: #f1c3a5;
+            --accent-2: #125b50;
+            --accent-3: #2864b8;
+            --accept: #2f8f63;
+            --reject: #cf4f5d;
+            --shadow: 0 18px 60px rgba(88, 65, 39, 0.12);
+            --radius: 20px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            background:
+                radial-gradient(circle at top left, rgba(203, 90, 46, 0.12), transparent 32%),
+                radial-gradient(circle at top right, rgba(18, 91, 80, 0.12), transparent 28%),
+                linear-gradient(180deg, #f7f0e1 0%, #efe6d5 100%);
+            color: var(--ink);
+            font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        }
+
+        body {
+            overflow-x: hidden;
+        }
+
+        .page-shell {
+            width: min(1480px, calc(100vw - 32px));
+            margin: 20px auto;
+            display: grid;
+            gap: 16px;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(120deg, rgba(255, 250, 241, 0.96), rgba(244, 233, 215, 0.9)),
+                var(--bg-alt);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 28px;
+        }
+
+        .hero::before,
+        .hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 999px;
+            pointer-events: none;
+        }
+
+        .hero::before {
+            width: 360px;
+            height: 360px;
+            background: radial-gradient(circle, rgba(203, 90, 46, 0.14), transparent 70%);
+            right: -80px;
+            top: -120px;
+        }
+
+        .hero::after {
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle, rgba(18, 91, 80, 0.16), transparent 70%);
+            left: -40px;
+            bottom: -80px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.62);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+            color: var(--accent-2);
+            font-size: 0.82rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 6px rgba(203, 90, 46, 0.12);
+        }
+
+        .hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+            gap: 28px;
+            align-items: end;
+            margin-top: 18px;
+        }
+
+        h1 {
+            margin: 12px 0 10px;
+            font-size: clamp(2.2rem, 5vw, 4.5rem);
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+            max-width: 11ch;
+        }
+
+        .hero-copy p {
+            margin: 0;
+            max-width: 62ch;
+            color: var(--muted);
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        .hero-points {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .hero-point {
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px solid rgba(77, 62, 44, 0.09);
+            border-radius: 16px;
+            padding: 14px 14px 12px;
+        }
+
+        .hero-point strong {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+        }
+
+        .hero-point span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+
+        .headline-card {
+            display: grid;
+            gap: 12px;
+            padding: 18px;
+            border-radius: 22px;
+            background: rgba(29, 26, 21, 0.92);
+            color: #fef8ee;
+            box-shadow: 0 18px 50px rgba(31, 27, 22, 0.2);
+        }
+
+        .headline-card h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #f4c9a6;
+        }
+
+        .headline-card p {
+            margin: 0;
+            color: rgba(254, 248, 238, 0.76);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .mini-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .mini-metric {
+            padding: 12px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .mini-metric label {
+            display: block;
+            color: rgba(254, 248, 238, 0.6);
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .mini-metric span {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 340px minmax(0, 1fr) 340px;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        .controls {
+            padding: 20px;
+            display: grid;
+            gap: 18px;
+            align-content: start;
+        }
+
+        .section-title {
+            margin: 0 0 10px;
+            font-size: 0.85rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .algo-switch {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .algo-btn,
+        .preset-btn,
+        .chip,
+        .run-btn,
+        .ghost-btn {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease;
+        }
+
+        .algo-btn {
+            padding: 12px 10px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--muted);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+            font: inherit;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .algo-btn.active {
+            color: white;
+            background: linear-gradient(135deg, var(--accent), #df845d);
+            box-shadow: 0 10px 26px rgba(203, 90, 46, 0.24);
+        }
+
+        .algo-btn:hover,
+        .preset-btn:hover,
+        .chip:hover,
+        .run-btn:hover,
+        .ghost-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .preset-grid,
+        .chip-row,
+        .button-row {
+            display: grid;
+            gap: 8px;
+        }
+
+        .preset-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .preset-btn {
+            padding: 12px;
+            text-align: left;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+            color: var(--ink);
+            font: inherit;
+        }
+
+        .preset-btn strong,
+        .preset-btn span {
+            display: block;
+        }
+
+        .preset-btn strong {
+            margin-bottom: 4px;
+            font-size: 0.88rem;
+        }
+
+        .preset-btn span {
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .button-row {
+            grid-template-columns: 1.4fr 1fr 1fr;
+        }
+
+        .run-btn {
+            border-radius: 16px;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, var(--accent-2), #2e887a);
+            color: white;
+            font: inherit;
+            font-weight: 700;
+            box-shadow: 0 12px 28px rgba(18, 91, 80, 0.18);
+        }
+
+        .ghost-btn {
+            border-radius: 16px;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--ink);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+            font: inherit;
+            font-weight: 700;
+        }
+
+        .chip-row {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .chip {
+            padding: 10px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.66);
+            color: var(--muted);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .chip.active {
+            color: white;
+            background: var(--accent-3);
+            box-shadow: 0 8px 22px rgba(40, 100, 184, 0.22);
+        }
+
+        .control-card {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.52);
+            border: 1px solid rgba(77, 62, 44, 0.07);
+        }
+
+        .slider-block + .slider-block {
+            margin-top: 14px;
+        }
+
+        .slider-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            align-items: baseline;
+        }
+
+        .slider-top label {
+            font-size: 0.9rem;
+        }
+
+        .slider-top output {
+            font-family: "Courier New", monospace;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin: 0;
+            appearance: none;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--accent-soft), rgba(18, 91, 80, 0.18));
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid var(--accent);
+            box-shadow: 0 6px 14px rgba(203, 90, 46, 0.16);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid var(--accent);
+            box-shadow: 0 6px 14px rgba(203, 90, 46, 0.16);
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 0;
+            border-top: 1px solid rgba(77, 62, 44, 0.08);
+        }
+
+        .toggle-row:first-of-type {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .toggle-meta strong {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 3px;
+        }
+
+        .toggle-meta span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.78rem;
+            line-height: 1.4;
+        }
+
+        .toggle {
+            width: 52px;
+            height: 30px;
+            padding: 3px;
+            border-radius: 999px;
+            background: rgba(77, 62, 44, 0.16);
+            position: relative;
+        }
+
+        .toggle::after {
+            content: "";
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            left: 3px;
+            top: 3px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+            transition: transform 180ms ease;
+        }
+
+        .toggle.active {
+            background: linear-gradient(135deg, var(--accent-2), #2c8173);
+        }
+
+        .toggle.active::after {
+            transform: translateX(22px);
+        }
+
+        .canvas-panel {
+            position: relative;
+            overflow: hidden;
+            min-height: 700px;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(203, 90, 46, 0.1), transparent 24%),
+                linear-gradient(180deg, rgba(255, 251, 245, 0.88), rgba(242, 232, 217, 0.95));
+        }
+
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            padding: 18px 20px 0;
+            position: relative;
+            z-index: 2;
+        }
+
+        .canvas-title h3,
+        .diag-card h3,
+        .lesson-card h3 {
+            margin: 0;
+            font-size: 1.05rem;
+        }
+
+        .canvas-title p,
+        .diag-card p,
+        .lesson-card p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            line-height: 1.55;
+            font-size: 0.9rem;
+        }
+
+        .stat-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            min-width: min(540px, 100%);
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid rgba(77, 62, 44, 0.09);
+            border-radius: 16px;
+            padding: 11px 12px;
+        }
+
+        .stat label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .stat span {
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .main-viz-wrap {
+            padding: 14px 18px 18px;
+        }
+
+        #mainCanvas {
+            width: 100%;
+            height: 560px;
+            display: block;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.52);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+        }
+
+        .legend-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding: 0 2px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .right-rail {
+            padding: 20px;
+            display: grid;
+            gap: 16px;
+            align-content: start;
+        }
+
+        .diag-grid {
+            display: grid;
+            gap: 14px;
+        }
+
+        .diag-card,
+        .lesson-card,
+        .formula-card {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+        }
+
+        .diag-card canvas {
+            width: 100%;
+            height: 160px;
+            display: block;
+            margin-top: 12px;
+            border-radius: 14px;
+            background: rgba(255, 251, 245, 0.9);
+            border: 1px solid rgba(77, 62, 44, 0.08);
+        }
+
+        .formula-card {
+            background: linear-gradient(145deg, rgba(31, 27, 22, 0.95), rgba(57, 47, 37, 0.95));
+            color: #fff6eb;
+        }
+
+        .formula-card .section-title {
+            color: rgba(255, 246, 235, 0.58);
+        }
+
+        .formula-card code {
+            display: block;
+            white-space: pre-wrap;
+            font-family: "Courier New", monospace;
+            font-size: 0.87rem;
+            line-height: 1.6;
+            color: #ffd8bb;
+        }
+
+        .formula-card p {
+            color: rgba(255, 246, 235, 0.74);
+        }
+
+        .bullet-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .bullet {
+            padding-left: 18px;
+            position: relative;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .bullet::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0.6em;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .lesson-banner {
+            padding: 18px 20px;
+            background: linear-gradient(120deg, rgba(18, 91, 80, 0.1), rgba(40, 100, 184, 0.08));
+            border: 1px solid rgba(18, 91, 80, 0.12);
+            border-radius: 18px;
+        }
+
+        .lesson-banner strong {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--accent-2);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .lesson-banner p {
+            margin: 0;
+            color: var(--ink);
+            line-height: 1.6;
+        }
+
+        .footer-note {
+            padding: 0 4px 8px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        @media (max-width: 1220px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls,
+            .right-rail {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .controls > :first-child,
+            .controls > :nth-child(2),
+            .controls > :nth-child(3),
+            .controls > :nth-child(4),
+            .controls > :nth-child(5),
+            .right-rail > * {
+                min-width: 0;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .page-shell {
+                width: min(100vw - 20px, 1480px);
+                margin: 10px auto 24px;
+            }
+
+            .hero,
+            .controls,
+            .right-rail {
+                padding: 16px;
+            }
+
+            .hero-points,
+            .preset-grid,
+            .chip-row,
+            .button-row,
+            .stat-strip,
+            .controls,
+            .right-rail,
+            .algo-switch {
+                grid-template-columns: 1fr;
+            }
+
+            .canvas-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #mainCanvas {
+                height: 420px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-shell">
+        <section class="hero">
+            <div class="eyebrow">MCMC Educational Studio</div>
+            <div class="hero-grid">
+                <div class="hero-copy">
+                    <h1>Build intuition for chains, not just formulas.</h1>
+                    <p>
+                        This teaching lab turns Markov Chain Monte Carlo into something you can see:
+                        proposals that leap or crawl, acceptance rates that signal trouble, traces that reveal
+                        mixing, and target landscapes that explain why some samplers get stuck.
+                    </p>
+                    <div class="hero-points">
+                        <div class="hero-point">
+                            <strong>Read the chain live</strong>
+                            <span>Watch each move and connect visual behavior to diagnostics like acceptance, ESS, and autocorrelation.</span>
+                        </div>
+                        <div class="hero-point">
+                            <strong>Stress it on purpose</strong>
+                            <span>Flip between presets to create sticky chains, over-diffuse proposals, or a clean well-tuned run.</span>
+                        </div>
+                        <div class="hero-point">
+                            <strong>Teach from the page</strong>
+                            <span>Built-in narration explains what students should notice and why the algorithm reacts that way.</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="headline-card">
+                    <h2>What Makes MCMC Hard</h2>
+                    <p id="heroInsight">
+                        A good chain balances exploration with believable proposals. Too timid and it crawls. Too bold and it gets rejected.
+                    </p>
+                    <div class="mini-metrics">
+                        <div class="mini-metric">
+                            <label>Target</label>
+                            <span id="heroTarget">Bimodal Mixture</span>
+                        </div>
+                        <div class="mini-metric">
+                            <label>Sampler</label>
+                            <span id="heroSampler">Metropolis</span>
+                        </div>
+                        <div class="mini-metric">
+                            <label id="heroEventLabel">Mode Hops</label>
+                            <span id="heroHops">0</span>
+                        </div>
+                        <div class="mini-metric">
+                            <label>Autocorr</label>
+                            <span id="heroAuto">0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="main-grid">
+            <aside class="panel controls">
+                <div class="control-card">
+                    <p class="section-title">Sampler</p>
+                    <div class="algo-switch">
+                        <button class="algo-btn active" data-algo="mh" title="Metropolis-Hastings">MH</button>
+                        <button class="algo-btn" data-algo="gibbs" title="Gibbs Sampling">Gibbs</button>
+                        <button class="algo-btn" data-algo="independence" title="Independence Sampler">Indep.</button>
+                        <button class="algo-btn" data-algo="smc" title="Sequential Monte Carlo / Particle Filter">SMC</button>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <p class="section-title">Teaching Presets</p>
+                    <div class="preset-grid">
+                        <button class="preset-btn" data-preset="balanced">
+                            <strong>Balanced</strong>
+                            <span>Good baseline for healthy exploration.</span>
+                        </button>
+                        <button class="preset-btn" data-preset="sticky">
+                            <strong>Sticky Chain</strong>
+                            <span>Tiny steps create slow mixing.</span>
+                        </button>
+                        <button class="preset-btn" data-preset="wild">
+                            <strong>Too Wild</strong>
+                            <span>Huge proposals create rejection storms.</span>
+                        </button>
+                        <button class="preset-btn" data-preset="barrier">
+                            <strong>Mode Barrier</strong>
+                            <span>Separated peaks make hopping difficult.</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <p class="section-title">Run Controls</p>
+                    <div class="button-row">
+                        <button class="run-btn" id="playBtn">Start Chain</button>
+                        <button class="ghost-btn" id="stepBtn">Single Step</button>
+                        <button class="ghost-btn" id="resetBtn">Reset</button>
+                    </div>
+                    <div class="chip-row" style="margin-top: 12px;">
+                        <button class="chip active" data-speed="1">1x</button>
+                        <button class="chip" data-speed="4">4x</button>
+                        <button class="chip" data-speed="12">12x</button>
+                        <button class="chip" data-speed="40">40x</button>
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <p class="section-title">Landscape</p>
+                    <div class="slider-block">
+                        <div class="slider-top">
+                            <label for="separationSlider">Mode separation</label>
+                            <output id="separationValue">3.0</output>
+                        </div>
+                        <input id="separationSlider" type="range" min="1" max="5.5" step="0.1" value="3.0">
+                    </div>
+                    <div class="slider-block">
+                        <div class="slider-top">
+                            <label for="corrSlider">Correlation</label>
+                            <output id="corrValue">0.78</output>
+                        </div>
+                        <input id="corrSlider" type="range" min="0" max="0.95" step="0.01" value="0.78">
+                    </div>
+                    <div class="slider-block">
+                        <div class="slider-top">
+                            <label for="ridgeSlider">Ridge sharpness</label>
+                            <output id="ridgeValue">0.55</output>
+                        </div>
+                        <input id="ridgeSlider" type="range" min="0.2" max="1.2" step="0.01" value="0.55">
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <p class="section-title">Proposal Mechanics</p>
+                    <div class="slider-block" data-visible-for="mh independence">
+                        <div class="slider-top">
+                            <label for="stepSlider">Proposal scale</label>
+                            <output id="stepValue">0.80</output>
+                        </div>
+                        <input id="stepSlider" type="range" min="0.1" max="3.2" step="0.05" value="0.8">
+                    </div>
+                    <div class="slider-block" data-visible-for="gibbs">
+                        <div class="slider-top">
+                            <label for="gibbsNoiseSlider">Conditional std</label>
+                            <output id="gibbsNoiseValue">0.52</output>
+                        </div>
+                        <input id="gibbsNoiseSlider" type="range" min="0.1" max="1.2" step="0.02" value="0.52">
+                    </div>
+                    <div class="slider-block" data-visible-for="independence">
+                        <div class="slider-top">
+                            <label for="independenceCenterSlider">Proposal center pull</label>
+                            <output id="independenceCenterValue">0.00</output>
+                        </div>
+                        <input id="independenceCenterSlider" type="range" min="-2.5" max="2.5" step="0.1" value="0">
+                    </div>
+                    <div class="slider-block" data-visible-for="smc">
+                        <div class="slider-top">
+                            <label for="particlesSlider">Particles</label>
+                            <output id="particlesValue">160</output>
+                        </div>
+                        <input id="particlesSlider" type="range" min="40" max="320" step="10" value="160">
+                    </div>
+                    <div class="slider-block" data-visible-for="smc">
+                        <div class="slider-top">
+                            <label for="resampleSlider">Resample threshold</label>
+                            <output id="resampleValue">0.55</output>
+                        </div>
+                        <input id="resampleSlider" type="range" min="0.2" max="0.95" step="0.01" value="0.55">
+                    </div>
+                </div>
+
+                <div class="control-card">
+                    <p class="section-title">View Options</p>
+                    <div class="toggle-row">
+                        <div class="toggle-meta">
+                            <strong>Show target field</strong>
+                            <span>Keep the probability landscape visible behind the chain.</span>
+                        </div>
+                        <button class="toggle active" id="targetToggle" aria-label="Toggle target field"></button>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-meta">
+                            <strong>Show trail</strong>
+                            <span>See recent accepted and rejected moves as a path.</span>
+                        </div>
+                        <button class="toggle active" id="trailToggle" aria-label="Toggle trail"></button>
+                    </div>
+                    <div class="toggle-row">
+                        <div class="toggle-meta">
+                            <strong>Show proposal ghost</strong>
+                            <span>Display the latest proposed state before accept or reject.</span>
+                        </div>
+                        <button class="toggle active" id="proposalToggle" aria-label="Toggle proposal ghost"></button>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="panel canvas-panel">
+                <div class="canvas-header">
+                    <div class="canvas-title">
+                        <h3 id="canvasTitle">Metropolis-Hastings on a Bimodal Target</h3>
+                        <p id="canvasSubtitle">Follow the random walk, compare proposals to the target density, and look for rare mode switches.</p>
+                    </div>
+                    <div class="stat-strip">
+                        <div class="stat">
+                            <label>Iteration</label>
+                            <span id="iterStat">0</span>
+                        </div>
+                        <div class="stat">
+                            <label id="stat2Label">Acceptance</label>
+                            <span id="acceptStat">0.0%</span>
+                        </div>
+                        <div class="stat">
+                            <label id="stat3Label">ESS Proxy</label>
+                            <span id="essStat">0</span>
+                        </div>
+                        <div class="stat">
+                            <label id="stat4Label">Mode Hops</label>
+                            <span id="hopStat">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="main-viz-wrap">
+                    <canvas id="mainCanvas"></canvas>
+                    <div class="legend-bar">
+                        <span class="legend-item"><span class="legend-swatch" style="background:#cb5a2e;"></span>Target density</span>
+                        <span class="legend-item"><span class="legend-swatch" style="background:#2f8f63;"></span>Accepted move</span>
+                        <span class="legend-item"><span class="legend-swatch" style="background:#cf4f5d;"></span>Rejected move</span>
+                        <span class="legend-item"><span class="legend-swatch" style="background:#2864b8;"></span>Current state</span>
+                        <span class="legend-item"><span class="legend-swatch" style="background:#d0aa2a;"></span>Proposal ghost</span>
+                        <span class="legend-item"><span class="legend-swatch" style="background:#125b50;"></span>Weighted particles</span>
+                    </div>
+                </div>
+            </main>
+
+            <aside class="panel right-rail">
+                <div class="lesson-banner">
+                    <strong>Now Notice This</strong>
+                    <p id="lessonBanner">
+                        In a bimodal landscape, local proposals usually stay inside one hill. Long residence times are not always wrong, but they can be a sign that the chain has poor global exploration.
+                    </p>
+                </div>
+
+                <div class="diag-grid">
+                    <div class="diag-card">
+                        <h3>Trace</h3>
+                        <p>The x-coordinate reveals whether the chain is stuck in one mode or moving between them.</p>
+                        <canvas id="traceCanvas"></canvas>
+                    </div>
+                    <div class="diag-card">
+                        <h3>Sample Histogram</h3>
+                        <p>Good mixing should reproduce the target’s two peaks rather than overfilling just one side.</p>
+                        <canvas id="histCanvas"></canvas>
+                    </div>
+                    <div class="diag-card">
+                        <h3>Autocorrelation</h3>
+                        <p>High lag correlation means adjacent draws carry redundant information.</p>
+                        <canvas id="acfCanvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="formula-card">
+                    <p class="section-title">Live Formula</p>
+                    <h3 id="formulaTitle">Metropolis Acceptance Rule</h3>
+                    <code id="formulaBlock">alpha = min(1, pi(x') / pi(x))</code>
+                    <p id="formulaCopy">Symmetric proposals cancel out, so the target density ratio decides whether the move survives.</p>
+                </div>
+
+                <div class="lesson-card">
+                    <h3>Teaching Notes</h3>
+                    <div class="bullet-list" id="notesList"></div>
+                </div>
+            </aside>
+        </section>
+
+        <p class="footer-note">
+            Conceived and designed by Peikai Chen, executed by AI.
+        </p>
+    </div>
+
+    <script>
+        const mainCanvas = document.getElementById('mainCanvas');
+        const mainCtx = mainCanvas.getContext('2d');
+        const traceCanvas = document.getElementById('traceCanvas');
+        const traceCtx = traceCanvas.getContext('2d');
+        const histCanvas = document.getElementById('histCanvas');
+        const histCtx = histCanvas.getContext('2d');
+        const acfCanvas = document.getElementById('acfCanvas');
+        const acfCtx = acfCanvas.getContext('2d');
+
+        const state = {
+            algo: 'mh',
+            running: false,
+            speed: 1,
+            lastTime: 0,
+            accumulator: 0,
+            iteration: 0,
+            accepted: 0,
+            rejected: 0,
+            hops: 0,
+            resamples: 0,
+            temperature: 0,
+            currentMode: 0,
+            current: { x: -1.6, y: 0.2 },
+            proposal: null,
+            proposalOrigin: null,
+            pendingTransition: null,
+            particles: [],
+            trail: [],
+            samples: [],
+            traceSeries: [],
+            acceptSeries: [],
+            message: '',
+            axisTurn: 'x',
+            toggles: {
+                showTarget: true,
+                showTrail: true,
+                showProposal: true
+            },
+            params: {
+                separation: 3.0,
+                correlation: 0.78,
+                ridgeSharpness: 0.55,
+                proposalScale: 0.8,
+                gibbsNoise: 0.52,
+                independenceCenter: 0.0,
+                particleCount: 160,
+                resampleThreshold: 0.55
+            }
+        };
+
+        const ui = {
+            playBtn: document.getElementById('playBtn'),
+            stepBtn: document.getElementById('stepBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            iterStat: document.getElementById('iterStat'),
+            acceptStat: document.getElementById('acceptStat'),
+            essStat: document.getElementById('essStat'),
+            hopStat: document.getElementById('hopStat'),
+            stat2Label: document.getElementById('stat2Label'),
+            stat3Label: document.getElementById('stat3Label'),
+            stat4Label: document.getElementById('stat4Label'),
+            lessonBanner: document.getElementById('lessonBanner'),
+            formulaTitle: document.getElementById('formulaTitle'),
+            formulaBlock: document.getElementById('formulaBlock'),
+            formulaCopy: document.getElementById('formulaCopy'),
+            notesList: document.getElementById('notesList'),
+            canvasTitle: document.getElementById('canvasTitle'),
+            canvasSubtitle: document.getElementById('canvasSubtitle'),
+            heroInsight: document.getElementById('heroInsight'),
+            heroTarget: document.getElementById('heroTarget'),
+            heroSampler: document.getElementById('heroSampler'),
+            heroEventLabel: document.getElementById('heroEventLabel'),
+            heroHops: document.getElementById('heroHops'),
+            heroAuto: document.getElementById('heroAuto')
+        };
+
+        const textByAlgo = {
+            mh: {
+                title: 'Metropolis-Hastings on a Bimodal Target',
+                subtitle: 'Follow the random walk, compare proposals to the target density, and look for rare mode switches.',
+                banner: 'In a bimodal landscape, local proposals usually stay inside one hill. Long residence times are not always wrong, but they can be a sign that the chain has poor global exploration.',
+                hero: 'A good Metropolis run sits in dense regions often enough to be credible, but still proposes bold enough moves to cross the valley sometimes.',
+                formulaTitle: 'Metropolis Acceptance Rule',
+                formula: "alpha = min(1, pi(x') / pi(x))",
+                formulaCopy: 'With a symmetric random-walk proposal, the proposal terms cancel and the target density ratio drives acceptance.',
+                notes: [
+                    'Increase proposal scale and the chain jumps farther, but acceptance usually falls.',
+                    'If the chain paints only one mode in the histogram, you are seeing poor global mixing.',
+                    'Autocorrelation near 1 means adjacent samples are telling you almost the same story.'
+                ],
+                target: 'Bimodal Mixture',
+                sampler: 'Metropolis'
+            },
+            gibbs: {
+                title: 'Gibbs Sampling Along a Correlated Ridge',
+                subtitle: 'One coordinate updates at a time, so movement looks like a staircase hugging the narrow high-density ridge.',
+                banner: 'Gibbs sampling avoids rejection by drawing from conditional distributions directly, but coordinate-wise updates can still mix slowly when variables are strongly coupled.',
+                hero: 'Gibbs trades accept-reject drama for structured conditionals. The right question becomes how quickly the alternating updates decorrelate the chain.',
+                formulaTitle: 'Gibbs Coordinate Update',
+                formula: "x ~ p(x | y)\\ny ~ p(y | x)",
+                formulaCopy: 'Every step is accepted, but mixing quality depends on how informative the conditionals are and how correlated the variables remain.',
+                notes: [
+                    'Alternating horizontal and vertical moves are the signature of coordinate-wise updates.',
+                    'High correlation makes each variable strongly constrain the other, so progress can still be slow.',
+                    'Acceptance is always 100%, which is why diagnostics beyond acceptance matter.'
+                ],
+                target: 'Correlated Gaussian',
+                sampler: 'Gibbs'
+            },
+            independence: {
+                title: 'Independence Sampler With a Mismatched Proposal',
+                subtitle: 'Proposals come from a fixed distribution rather than the current state, so fit between proposal and target becomes the whole game.',
+                banner: 'Independence samplers shine when the proposal already looks like the target. When it does not, you get dramatic rejection patterns or biased coverage.',
+                hero: 'An independence sampler is brutally honest: if your proposal misses the target’s shape, the chain tells on you immediately.',
+                formulaTitle: 'Independence Sampler Rule',
+                formula: "alpha = min(1, pi(x') q(x) / (pi(x) q(x')))",
+                formulaCopy: 'Now the proposal density matters. A poor proposal can hurt acceptance even when the target density at the proposal is decent.',
+                notes: [
+                    'Move the proposal center away from the target and watch acceptance collapse.',
+                    'A well-matched independence proposal can hop modes more easily than a local random walk.',
+                    'This is a good way to teach why proposal design is a modeling choice, not a detail.'
+                ],
+                target: 'Bimodal Mixture',
+                sampler: 'Independence'
+            },
+            smc: {
+                title: 'Sequential Monte Carlo / Particle Filter',
+                subtitle: 'A cloud of weighted particles tracks the target together, then resamples when too much weight collapses onto a few survivors.',
+                banner: 'SMC is not a Markov chain on one point. It is a population method, so the key teaching questions are weight degeneracy, effective sample size, and when resampling helps or harms diversity.',
+                hero: 'Particle methods make uncertainty visible as a swarm. You can watch information concentrate, then see resampling trade weight quality for duplicated ancestry.',
+                formulaTitle: 'SMC Weighting And Resampling',
+                formula: "w_i <- w_i * pi(x_i)^delta\\nESS = 1 / sum_i w_i^2",
+                formulaCopy: 'As temperature increases, particles closer to the target gain weight. When ESS gets too small, resampling prevents collapse but also reduces genealogical diversity.',
+                notes: [
+                    'ESS falling sharply means only a few particles matter, even if the cloud still looks large.',
+                    'Resampling repairs weight degeneracy, but repeated resampling can create many near-clones.',
+                    'This is the cleanest contrast with MCMC: we are evolving a population, not one chain.'
+                ],
+                target: 'Tempered Mixture',
+                sampler: 'Particle Filter'
+            }
+        };
+
+        function randn() {
+            let u = 0;
+            let v = 0;
+            while (u === 0) u = Math.random();
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function resizeCanvasToDisplay(canvas, fallbackHeight) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(100, Math.round(rect.width * dpr));
+            const height = Math.max(100, Math.round((rect.height || fallbackHeight) * dpr));
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+            }
+        }
+
+        function worldToScreen(x, y, canvas) {
+            const pad = 40;
+            const w = canvas.width;
+            const h = canvas.height;
+            const scale = Math.min(w - pad * 2, h - pad * 2) / 10.5;
+            return {
+                x: w / 2 + x * scale,
+                y: h / 2 - y * scale,
+                scale
+            };
+        }
+
+        function screenToWorld(px, py, canvas) {
+            const pad = 40;
+            const w = canvas.width;
+            const h = canvas.height;
+            const scale = Math.min(w - pad * 2, h - pad * 2) / 10.5;
+            return {
+                x: (px - w / 2) / scale,
+                y: -(py - h / 2) / scale
+            };
+        }
+
+        function gaussian2d(x, y, meanX, meanY, sigmaX, sigmaY, rho) {
+            const dx = (x - meanX) / sigmaX;
+            const dy = (y - meanY) / sigmaY;
+            const oneMinus = Math.max(1e-6, 1 - rho * rho);
+            const exponent = -(dx * dx - 2 * rho * dx * dy + dy * dy) / (2 * oneMinus);
+            const norm = 1 / (2 * Math.PI * sigmaX * sigmaY * Math.sqrt(oneMinus));
+            return norm * Math.exp(exponent);
+        }
+
+        function targetDensity(x, y) {
+            if (state.algo === 'gibbs') {
+                const rho = state.params.correlation;
+                const marginalSigma = state.params.gibbsNoise / Math.sqrt(Math.max(1e-6, 1 - rho * rho));
+                return gaussian2d(x, y, 0, 0, marginalSigma, marginalSigma, rho);
+            }
+
+            const sep = state.params.separation;
+            const ridge = state.params.ridgeSharpness;
+            const left = gaussian2d(x, y, -sep / 2, 0.3, 0.85, ridge, -0.12);
+            const right = gaussian2d(x, y, sep / 2, -0.2, 0.85, ridge, 0.12);
+            return 0.5 * left + 0.5 * right;
+        }
+
+        function independenceProposalDensity(x, y) {
+            return gaussian2d(x, y, state.params.independenceCenter, 0, 1.8, 1.2, 0);
+        }
+
+        function currentParticleMean() {
+            if (!state.particles.length) return { x: 0, y: 0 };
+            let x = 0;
+            let y = 0;
+            let total = 0;
+            state.particles.forEach((particle) => {
+                x += particle.x * particle.weight;
+                y += particle.y * particle.weight;
+                total += particle.weight;
+            });
+            if (total <= 0) return { x: 0, y: 0 };
+            return { x: x / total, y: y / total };
+        }
+
+        function smcEss() {
+            if (!state.particles.length) return 0;
+            let sumSquares = 0;
+            state.particles.forEach((particle) => {
+                sumSquares += particle.weight * particle.weight;
+            });
+            return sumSquares > 0 ? 1 / sumSquares : 0;
+        }
+
+        function initializeParticles() {
+            state.particles = [];
+            for (let i = 0; i < state.params.particleCount; i += 1) {
+                state.particles.push({
+                    x: randn() * 2.2,
+                    y: randn() * 1.4,
+                    weight: 1 / state.params.particleCount
+                });
+            }
+        }
+
+        function conditionalForX(y) {
+            const rho = state.params.correlation;
+            const std = state.params.gibbsNoise;
+            return {
+                mean: rho * y,
+                std
+            };
+        }
+
+        function conditionalForY(x) {
+            const rho = state.params.correlation;
+            const std = state.params.gibbsNoise;
+            return {
+                mean: rho * x,
+                std
+            };
+        }
+
+        function resetChain() {
+            state.iteration = 0;
+            state.accepted = 0;
+            state.rejected = 0;
+            state.hops = 0;
+            state.resamples = 0;
+            state.temperature = 0;
+            state.currentMode = 0;
+            state.proposal = null;
+            state.proposalOrigin = null;
+            state.pendingTransition = null;
+            state.particles = [];
+            state.trail = [];
+            state.samples = [];
+            state.traceSeries = [];
+            state.acceptSeries = [];
+            state.axisTurn = 'x';
+            state.accumulator = 0;
+            state.lastTime = 0;
+            if (state.algo === 'gibbs') {
+                state.current = { x: -0.4, y: 0.8 };
+            } else if (state.algo === 'smc') {
+                initializeParticles();
+                state.current = currentParticleMean();
+            } else {
+                state.current = { x: -state.params.separation / 2 + randn() * 0.4, y: randn() * 0.35 };
+                state.currentMode = state.current.x >= 0 ? 1 : -1;
+            }
+            addSample();
+            updateNarrative();
+            renderAll();
+        }
+
+        function addSample() {
+            const sample = { x: state.current.x, y: state.current.y, accepted: true, iter: state.iteration };
+            state.samples.push(sample);
+            state.traceSeries.push({ iter: state.iteration, x: state.current.x, y: state.current.y });
+            if (state.samples.length > 1800) state.samples.shift();
+            if (state.traceSeries.length > 400) state.traceSeries.shift();
+            if (state.trail.length > 220) state.trail.shift();
+        }
+
+        function pushTrail(from, to, accepted, meta) {
+            state.trail.push({
+                fromX: from.x,
+                fromY: from.y,
+                toX: to.x,
+                toY: to.y,
+                accepted,
+                dashed: !accepted,
+                kind: meta || 'move'
+            });
+            if (state.trail.length > 220) state.trail.shift();
+        }
+
+        function createMetropolisTransition() {
+            const from = { ...state.current };
+            const proposal = {
+                x: state.current.x + randn() * state.params.proposalScale,
+                y: state.current.y + randn() * state.params.proposalScale * 0.75
+            };
+            const currentDensity = targetDensity(from.x, from.y);
+            const proposalDensity = targetDensity(proposal.x, proposal.y);
+            const alpha = clamp(proposalDensity / Math.max(currentDensity, 1e-12), 0, 1);
+            const accepted = Math.random() < alpha;
+            return { from, proposal, accepted, kind: accepted ? 'accepted' : 'rejected' };
+        }
+
+        function createIndependenceTransition() {
+            const from = { ...state.current };
+            const proposal = {
+                x: state.params.independenceCenter + randn() * state.params.proposalScale * 1.7,
+                y: randn() * state.params.proposalScale
+            };
+
+            const currentDensity = targetDensity(from.x, from.y);
+            const proposalDensity = targetDensity(proposal.x, proposal.y);
+            const qCurrent = independenceProposalDensity(from.x, from.y);
+            const qProposal = independenceProposalDensity(proposal.x, proposal.y);
+            const alpha = clamp((proposalDensity * qCurrent) / Math.max(currentDensity * qProposal, 1e-12), 0, 1);
+            const accepted = Math.random() < alpha;
+            return { from, proposal, accepted, kind: accepted ? 'accepted' : 'rejected' };
+        }
+
+        function finalizeProposalTransition(transition) {
+            state.proposal = transition.proposal;
+            state.proposalOrigin = transition.from;
+
+            if (transition.accepted) {
+                state.current = transition.proposal;
+                state.accepted += 1;
+            } else {
+                state.rejected += 1;
+            }
+
+            pushTrail(transition.from, transition.proposal, transition.accepted, transition.kind);
+            state.acceptSeries.push(transition.accepted ? 1 : 0);
+            if (state.acceptSeries.length > 200) state.acceptSeries.shift();
+            state.iteration += 1;
+
+            const newMode = state.current.x >= 0 ? 1 : -1;
+            if (transition.accepted && state.currentMode !== 0 && newMode !== state.currentMode) {
+                state.hops += 1;
+            }
+            state.currentMode = newMode;
+            addSample();
+        }
+
+        function beginProposalTransition(stepInterval) {
+            let transition = null;
+            if (state.algo === 'mh') transition = createMetropolisTransition();
+            if (state.algo === 'independence') transition = createIndependenceTransition();
+            if (!transition) return false;
+
+            state.pendingTransition = {
+                ...transition,
+                elapsed: 0,
+                duration: stepInterval,
+                proposalDuration: Math.max(120, stepInterval * 0.42),
+                decisionDuration: Math.max(120, stepInterval * 0.26),
+                moveDuration: Math.max(140, stepInterval * 0.18),
+                phase: 'proposal'
+            };
+            state.proposal = transition.proposal;
+            state.proposalOrigin = transition.from;
+            return true;
+        }
+
+        function gibbsStep() {
+            const from = { ...state.current };
+            state.proposalOrigin = from;
+            if (state.axisTurn === 'x') {
+                const conditional = conditionalForX(state.current.y);
+                state.current.x = conditional.mean + conditional.std * randn();
+                state.axisTurn = 'y';
+                pushTrail(from, state.current, true, 'x');
+            } else {
+                const conditional = conditionalForY(state.current.x);
+                state.current.y = conditional.mean + conditional.std * randn();
+                state.axisTurn = 'x';
+                pushTrail(from, state.current, true, 'y');
+            }
+            state.proposal = { ...state.current };
+            state.accepted += 1;
+            state.acceptSeries.push(1);
+            if (state.acceptSeries.length > 200) state.acceptSeries.shift();
+            state.iteration += 1;
+            addSample();
+        }
+
+        function smcStep() {
+            const previousMean = currentParticleMean();
+            const deltaTemp = 0.05;
+            state.temperature = Math.min(1, state.temperature + deltaTemp);
+            const moveScale = 0.12 + state.params.proposalScale * 0.18;
+
+            state.particles.forEach((particle) => {
+                particle.x += randn() * moveScale;
+                particle.y += randn() * moveScale * 0.8;
+                const weightFactor = Math.pow(Math.max(targetDensity(particle.x, particle.y), 1e-9), deltaTemp);
+                particle.weight *= weightFactor;
+            });
+
+            let totalWeight = 0;
+            state.particles.forEach((particle) => {
+                totalWeight += particle.weight;
+            });
+            if (totalWeight <= 0) {
+                initializeParticles();
+            } else {
+                state.particles.forEach((particle) => {
+                    particle.weight /= totalWeight;
+                });
+            }
+
+            const essRatio = smcEss() / Math.max(1, state.particles.length);
+            if (essRatio < state.params.resampleThreshold) {
+                const cumulative = [];
+                let running = 0;
+                state.particles.forEach((particle) => {
+                    running += particle.weight;
+                    cumulative.push(running);
+                });
+
+                const resampled = [];
+                const n = state.particles.length;
+                const start = Math.random() / n;
+                let idx = 0;
+                for (let i = 0; i < n; i += 1) {
+                    const u = start + i / n;
+                    while (idx < cumulative.length - 1 && u > cumulative[idx]) idx += 1;
+                    const parent = state.particles[idx];
+                    resampled.push({
+                        x: parent.x + randn() * 0.06,
+                        y: parent.y + randn() * 0.06,
+                        weight: 1 / n
+                    });
+                }
+                state.particles = resampled;
+                state.resamples += 1;
+            }
+
+            state.current = currentParticleMean();
+            state.proposal = { ...state.current };
+            state.proposalOrigin = previousMean;
+            state.accepted = Math.round(smcEss());
+            state.iteration += 1;
+            pushTrail(previousMean, state.current, true, 'smc');
+            addSample();
+        }
+
+        function runOneStep() {
+            if (state.algo === 'mh' || state.algo === 'independence') {
+                beginProposalTransition(650);
+            }
+            if (state.algo === 'gibbs') gibbsStep();
+            if (state.algo === 'smc') smcStep();
+            updateNarrative();
+            updateStats();
+            renderAll();
+            if (!state.running && state.pendingTransition) requestAnimationFrame(animationFrame);
+        }
+
+        function acceptanceRate() {
+            if (state.iteration === 0) return 0;
+            return state.accepted / state.iteration;
+        }
+
+        function lagAutocorrelation(values, lag) {
+            if (values.length <= lag + 2) return 0;
+            const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+            let numerator = 0;
+            let denominator = 0;
+            for (let i = 0; i < values.length; i++) {
+                const centered = values[i] - mean;
+                denominator += centered * centered;
+                if (i + lag < values.length) {
+                    numerator += centered * (values[i + lag] - mean);
+                }
+            }
+            if (denominator === 0) return 0;
+            return numerator / denominator;
+        }
+
+        function essProxy() {
+            if (state.algo === 'smc') {
+                return Math.round(smcEss());
+            }
+            const values = state.samples.slice(-300).map((sample) => sample.x);
+            if (values.length < 10) return values.length;
+            let tau = 1;
+            for (let lag = 1; lag <= Math.min(20, values.length - 2); lag++) {
+                const rho = lagAutocorrelation(values, lag);
+                if (rho <= 0) break;
+                tau += 2 * rho;
+            }
+            return Math.max(1, Math.round(values.length / tau));
+        }
+
+        function updateStats() {
+            const accept = acceptanceRate();
+            ui.iterStat.textContent = String(state.iteration);
+            if (state.algo === 'smc') {
+                ui.stat2Label.textContent = 'ESS Ratio';
+                ui.stat3Label.textContent = 'Resamples';
+                ui.stat4Label.textContent = 'Temperature';
+                ui.heroEventLabel.textContent = 'Resamples';
+                ui.acceptStat.textContent = `${((smcEss() / Math.max(1, state.particles.length)) * 100).toFixed(1)}%`;
+                ui.essStat.textContent = String(state.resamples);
+                ui.hopStat.textContent = state.temperature.toFixed(2);
+            } else {
+                ui.stat2Label.textContent = 'Acceptance';
+                ui.stat3Label.textContent = 'ESS Proxy';
+                ui.stat4Label.textContent = 'Mode Hops';
+                ui.heroEventLabel.textContent = 'Mode Hops';
+                ui.acceptStat.textContent = `${(accept * 100).toFixed(1)}%`;
+                ui.essStat.textContent = String(essProxy());
+                ui.hopStat.textContent = String(state.hops);
+            }
+            ui.heroHops.textContent = state.algo === 'smc' ? String(state.resamples) : String(state.hops);
+            ui.heroAuto.textContent = lagAutocorrelation(state.samples.slice(-220).map((s) => s.x), 1).toFixed(2);
+        }
+
+        function setAlgo(algo) {
+            state.algo = algo;
+            document.querySelectorAll('.algo-btn').forEach((button) => {
+                button.classList.toggle('active', button.dataset.algo === algo);
+            });
+            document.querySelectorAll('[data-visible-for]').forEach((node) => {
+                const visibleFor = node.dataset.visibleFor.split(' ');
+                node.style.display = visibleFor.includes(algo) ? 'block' : 'none';
+            });
+            const content = textByAlgo[algo];
+            ui.canvasTitle.textContent = content.title;
+            ui.canvasSubtitle.textContent = content.subtitle;
+            ui.heroInsight.textContent = content.hero;
+            ui.heroTarget.textContent = content.target;
+            ui.heroSampler.textContent = content.sampler;
+            ui.formulaTitle.textContent = content.formulaTitle;
+            ui.formulaBlock.textContent = content.formula;
+            ui.formulaCopy.textContent = content.formulaCopy;
+            ui.lessonBanner.textContent = content.banner;
+            ui.notesList.innerHTML = content.notes.map((note) => `<div class="bullet">${note}</div>`).join('');
+            resetChain();
+        }
+
+        function applyPreset(name) {
+            if (name === 'balanced') {
+                state.params.proposalScale = 0.8;
+                state.params.separation = 3.0;
+                state.params.correlation = 0.78;
+                state.params.ridgeSharpness = 0.55;
+                state.params.gibbsNoise = 0.52;
+                state.params.independenceCenter = 0;
+                state.params.particleCount = 160;
+                state.params.resampleThreshold = 0.55;
+            } else if (name === 'sticky') {
+                state.params.proposalScale = 0.23;
+                state.params.separation = 3.0;
+                state.params.correlation = 0.9;
+                state.params.ridgeSharpness = 0.4;
+                state.params.gibbsNoise = 0.2;
+                state.params.independenceCenter = 0;
+                state.params.particleCount = 200;
+                state.params.resampleThreshold = 0.75;
+            } else if (name === 'wild') {
+                state.params.proposalScale = 2.55;
+                state.params.separation = 3.2;
+                state.params.correlation = 0.7;
+                state.params.ridgeSharpness = 0.55;
+                state.params.gibbsNoise = 0.7;
+                state.params.independenceCenter = 0;
+                state.params.particleCount = 120;
+                state.params.resampleThreshold = 0.35;
+            } else if (name === 'barrier') {
+                state.params.proposalScale = 0.95;
+                state.params.separation = 5.0;
+                state.params.correlation = 0.82;
+                state.params.ridgeSharpness = 0.42;
+                state.params.gibbsNoise = 0.4;
+                state.params.independenceCenter = 1.2;
+                state.params.particleCount = 220;
+                state.params.resampleThreshold = 0.6;
+            }
+            syncControls();
+            resetChain();
+        }
+
+        function updateNarrative() {
+            const accept = acceptanceRate();
+            const autocorr = lagAutocorrelation(state.samples.slice(-220).map((s) => s.x), 1);
+
+            if (state.algo === 'mh') {
+                if (state.iteration < 20) {
+                    state.message = 'The chain is still in its early transient phase. Use the trace and histogram together before judging performance.';
+                } else if (accept < 0.18) {
+                    state.message = 'Acceptance is very low. Proposals are probably too ambitious, so the chain keeps bouncing off low-density regions.';
+                } else if (accept > 0.8) {
+                    state.message = 'Acceptance is very high. That often means tiny proposal steps and a chain that moves politely but explores slowly.';
+                } else if (state.hops === 0 && state.params.separation > 4) {
+                    state.message = 'The chain has not switched modes yet. This is exactly the failure mode that makes multimodal targets challenging for local random walks.';
+                } else {
+                    state.message = 'This is the sweet spot to discuss the exploration-versus-acceptance tradeoff. Ask whether the histogram matches both modes and whether lag-1 correlation is falling.';
+                }
+            } else if (state.algo === 'gibbs') {
+                if (state.params.correlation > 0.88) {
+                    state.message = 'Strong correlation forces the chain to walk along a narrow ridge. Even with 100% acceptance, the effective sample size can remain modest.';
+                } else if (state.params.gibbsNoise < 0.2) {
+                    state.message = 'The conditional draws are very concentrated, so successive states barely differ. This is a nice reminder that acceptance alone is not a performance metric.';
+                } else {
+                    state.message = 'Watch the staircase path. Gibbs is moving by exact conditional draws, and the key diagnostic question is how quickly that path forgets where it started.';
+                }
+            } else if (state.algo === 'independence') {
+                if (accept < 0.18) {
+                    state.message = 'The independence proposal is mismatched to the target. Because proposals ignore the current state, bad proposal design is punished immediately.';
+                } else if (Math.abs(state.params.independenceCenter) > 1.5) {
+                    state.message = 'The proposal is biased toward one side. You can use this to show how a poor proposal can over-visit one mode or make the other hard to reach.';
+                } else if (state.hops > 2) {
+                    state.message = 'Notice the easier mode hopping compared with local random walks. Independence proposals can help global exploration when they resemble the target well.';
+                } else {
+                    state.message = 'This sampler lives or dies by proposal quality. Ask whether q(x) is actually a decent global sketch of the target.';
+                }
+            } else {
+                const essRatio = smcEss() / Math.max(1, state.particles.length);
+                if (essRatio < 0.3) {
+                    state.message = 'Weight degeneracy is severe right now. A few particles dominate, so the nominal particle count is misleadingly optimistic.';
+                } else if (state.resamples > 0 && essRatio > 0.75) {
+                    state.message = 'Resampling has refreshed the particle cloud. The next teaching question is whether diversity survives or whether too many clones were created.';
+                } else if (state.temperature < 0.5) {
+                    state.message = 'The particle system is still tempering toward the target. Early steps show how weights begin to separate before full concentration happens.';
+                } else {
+                    state.message = 'This is a nice regime for discussing ESS, resampling thresholds, and why particle methods expose uncertainty as a weighted population instead of one trajectory.';
+                }
+            }
+
+            ui.lessonBanner.textContent = state.message;
+        }
+
+        function drawBackgroundField() {
+            if (!state.toggles.showTarget) return;
+
+            const width = mainCanvas.width;
+            const height = mainCanvas.height;
+            const image = mainCtx.createImageData(width, height);
+            const data = image.data;
+            let maxDensity = 0;
+            const grid = [];
+
+            for (let py = 0; py < height; py += 3) {
+                for (let px = 0; px < width; px += 3) {
+                    const point = screenToWorld(px, py, mainCanvas);
+                    const density = targetDensity(point.x, point.y);
+                    grid.push({ px, py, density });
+                    if (density > maxDensity) maxDensity = density;
+                }
+            }
+
+            grid.forEach(({ px, py, density }) => {
+                const alpha = Math.pow(density / Math.max(maxDensity, 1e-9), 0.58);
+                const r = Math.round(255 - alpha * 52);
+                const g = Math.round(245 - alpha * 126);
+                const b = Math.round(232 - alpha * 164);
+                for (let dy = 0; dy < 3 && py + dy < height; dy++) {
+                    for (let dx = 0; dx < 3 && px + dx < width; dx++) {
+                        const idx = ((py + dy) * width + (px + dx)) * 4;
+                        data[idx] = r;
+                        data[idx + 1] = g;
+                        data[idx + 2] = b;
+                        data[idx + 3] = Math.round(255 * alpha * 0.86);
+                    }
+                }
+            });
+
+            mainCtx.putImageData(image, 0, 0);
+        }
+
+        function drawAxesAndGrid() {
+            const { width, height } = mainCanvas;
+            mainCtx.save();
+            mainCtx.strokeStyle = 'rgba(77, 62, 44, 0.08)';
+            mainCtx.lineWidth = 1;
+            for (let x = -4; x <= 4; x += 1) {
+                const sx = worldToScreen(x, 0, mainCanvas).x;
+                mainCtx.beginPath();
+                mainCtx.moveTo(sx, 0);
+                mainCtx.lineTo(sx, height);
+                mainCtx.stroke();
+            }
+            for (let y = -4; y <= 4; y += 1) {
+                const sy = worldToScreen(0, y, mainCanvas).y;
+                mainCtx.beginPath();
+                mainCtx.moveTo(0, sy);
+                mainCtx.lineTo(width, sy);
+                mainCtx.stroke();
+            }
+            mainCtx.strokeStyle = 'rgba(77, 62, 44, 0.18)';
+            mainCtx.lineWidth = 1.5;
+            const origin = worldToScreen(0, 0, mainCanvas);
+            mainCtx.beginPath();
+            mainCtx.moveTo(origin.x, 0);
+            mainCtx.lineTo(origin.x, height);
+            mainCtx.moveTo(0, origin.y);
+            mainCtx.lineTo(width, origin.y);
+            mainCtx.stroke();
+            mainCtx.restore();
+        }
+
+        function drawTrail() {
+            if (!state.toggles.showTrail || state.trail.length === 0) return;
+            mainCtx.save();
+            state.trail.forEach((segment, index) => {
+                const alpha = (index + 1) / state.trail.length;
+                const from = worldToScreen(segment.fromX, segment.fromY, mainCanvas);
+                const to = worldToScreen(segment.toX, segment.toY, mainCanvas);
+                let color = segment.accepted ? `rgba(47, 143, 99, ${alpha * 0.82})` : `rgba(139, 96, 52, ${alpha * 0.72})`;
+                if (segment.kind === 'x') color = `rgba(203, 90, 46, ${alpha * 0.75})`;
+                if (segment.kind === 'y') color = `rgba(40, 100, 184, ${alpha * 0.75})`;
+                mainCtx.strokeStyle = color;
+                mainCtx.lineWidth = segment.accepted ? 2.5 : 1.8;
+                mainCtx.setLineDash(segment.dashed ? [9, 7] : []);
+                mainCtx.beginPath();
+                mainCtx.moveTo(from.x, from.y);
+                mainCtx.lineTo(to.x, to.y);
+                mainCtx.stroke();
+            });
+            mainCtx.setLineDash([]);
+            mainCtx.restore();
+        }
+
+        function drawPendingTransition() {
+            if (!state.toggles.showProposal || !state.pendingTransition || state.algo === 'smc') return;
+            const proposalOnly = state.pendingTransition.phase === 'proposal';
+            const decisionReject = state.pendingTransition.phase === 'decision' && !state.pendingTransition.accepted;
+            const decisionAccept = state.pendingTransition.phase === 'decision' && state.pendingTransition.accepted;
+            const movingAccept = state.pendingTransition.phase === 'move' && state.pendingTransition.accepted;
+            const proposal = worldToScreen(state.proposal.x, state.proposal.y, mainCanvas);
+            mainCtx.save();
+            if (state.algo !== 'gibbs' && state.proposalOrigin) {
+                const current = worldToScreen(state.proposalOrigin.x, state.proposalOrigin.y, mainCanvas);
+                if (proposalOnly) {
+                    mainCtx.strokeStyle = 'rgba(47, 143, 99, 0.95)';
+                    mainCtx.lineWidth = 2;
+                    mainCtx.setLineDash([9, 7]);
+                } else if (decisionAccept || movingAccept) {
+                    mainCtx.strokeStyle = 'rgba(47, 143, 99, 0.95)';
+                    mainCtx.lineWidth = 2.5;
+                    mainCtx.setLineDash([]);
+                } else if (decisionReject) {
+                    mainCtx.strokeStyle = 'rgba(139, 96, 52, 0.92)';
+                    mainCtx.lineWidth = 2;
+                    mainCtx.setLineDash([9, 7]);
+                }
+                mainCtx.beginPath();
+                mainCtx.moveTo(current.x, current.y);
+                mainCtx.lineTo(proposal.x, proposal.y);
+                mainCtx.stroke();
+                mainCtx.setLineDash([]);
+            }
+            mainCtx.restore();
+        }
+
+        function drawSamples() {
+            if (state.algo === 'smc') return;
+            mainCtx.save();
+            state.samples.slice(-500).forEach((sample, index) => {
+                const p = worldToScreen(sample.x, sample.y, mainCanvas);
+                const alpha = 0.08 + (index / Math.max(1, state.samples.length)) * 0.22;
+                mainCtx.fillStyle = `rgba(18, 91, 80, ${alpha})`;
+                mainCtx.beginPath();
+                mainCtx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+                mainCtx.fill();
+            });
+            mainCtx.restore();
+        }
+
+        function drawCurrentState() {
+            if (state.algo === 'smc') return;
+            let displayPoint = state.current;
+            if (state.pendingTransition && state.proposalOrigin) {
+                if (state.pendingTransition.phase === 'proposal' || state.pendingTransition.phase === 'decision') {
+                    displayPoint = state.pendingTransition.from;
+                } else if (state.pendingTransition.phase === 'move' && state.pendingTransition.accepted) {
+                    const progress = Math.min(1, state.pendingTransition.moveElapsed / Math.max(1, state.pendingTransition.moveDuration));
+                    displayPoint = {
+                        x: state.pendingTransition.from.x + (state.pendingTransition.proposal.x - state.pendingTransition.from.x) * progress,
+                        y: state.pendingTransition.from.y + (state.pendingTransition.proposal.y - state.pendingTransition.from.y) * progress
+                    };
+                }
+            }
+            const p = worldToScreen(displayPoint.x, displayPoint.y, mainCanvas);
+            const glow = mainCtx.createRadialGradient(p.x, p.y, 1, p.x, p.y, 32);
+            glow.addColorStop(0, 'rgba(40, 100, 184, 0.42)');
+            glow.addColorStop(1, 'rgba(40, 100, 184, 0)');
+            mainCtx.fillStyle = glow;
+            mainCtx.beginPath();
+            mainCtx.arc(p.x, p.y, 32, 0, Math.PI * 2);
+            mainCtx.fill();
+
+            mainCtx.fillStyle = '#2864b8';
+            mainCtx.strokeStyle = 'white';
+            mainCtx.lineWidth = 3;
+            mainCtx.beginPath();
+            mainCtx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+            mainCtx.fill();
+            mainCtx.stroke();
+        }
+
+        function drawParticles() {
+            if (state.algo !== 'smc') return;
+            mainCtx.save();
+            state.particles.forEach((particle) => {
+                const p = worldToScreen(particle.x, particle.y, mainCanvas);
+                const radius = 2 + 10 * particle.weight * state.particles.length / Math.max(1, Math.sqrt(state.particles.length));
+                const alpha = 0.2 + 0.7 * Math.min(1, particle.weight * state.particles.length);
+                mainCtx.fillStyle = `rgba(18, 91, 80, ${alpha})`;
+                mainCtx.beginPath();
+                mainCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                mainCtx.fill();
+            });
+
+            const mean = worldToScreen(state.current.x, state.current.y, mainCanvas);
+            mainCtx.fillStyle = '#2864b8';
+            mainCtx.strokeStyle = 'white';
+            mainCtx.lineWidth = 3;
+            mainCtx.beginPath();
+            mainCtx.arc(mean.x, mean.y, 9, 0, Math.PI * 2);
+            mainCtx.fill();
+            mainCtx.stroke();
+            mainCtx.restore();
+        }
+
+        function renderMainCanvas() {
+            resizeCanvasToDisplay(mainCanvas, 560);
+            mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+            drawBackgroundField();
+            drawAxesAndGrid();
+            drawSamples();
+            drawTrail();
+            drawPendingTransition();
+            drawParticles();
+            drawCurrentState();
+        }
+
+        function drawTrace() {
+            resizeCanvasToDisplay(traceCanvas, 160);
+            const { width, height } = traceCanvas;
+            traceCtx.clearRect(0, 0, width, height);
+            traceCtx.fillStyle = 'rgba(255, 251, 245, 0.96)';
+            traceCtx.fillRect(0, 0, width, height);
+            const values = state.traceSeries.slice(-220);
+            if (values.length < 2) return;
+
+            const pad = 18;
+            const xs = values.map((item) => item.x);
+            const minY = Math.min(...xs, -4);
+            const maxY = Math.max(...xs, 4);
+            traceCtx.strokeStyle = 'rgba(77, 62, 44, 0.12)';
+            traceCtx.beginPath();
+            traceCtx.moveTo(pad, height - pad);
+            traceCtx.lineTo(width - pad, height - pad);
+            traceCtx.moveTo(pad, pad);
+            traceCtx.lineTo(pad, height - pad);
+            traceCtx.stroke();
+
+            traceCtx.strokeStyle = '#2864b8';
+            traceCtx.lineWidth = 2.2;
+            traceCtx.beginPath();
+            values.forEach((item, index) => {
+                const x = pad + (index / (values.length - 1)) * (width - pad * 2);
+                const y = height - pad - ((item.x - minY) / Math.max(1e-9, maxY - minY)) * (height - pad * 2);
+                if (index === 0) traceCtx.moveTo(x, y);
+                else traceCtx.lineTo(x, y);
+            });
+            traceCtx.stroke();
+        }
+
+        function drawHistogram() {
+            resizeCanvasToDisplay(histCanvas, 160);
+            const { width, height } = histCanvas;
+            histCtx.clearRect(0, 0, width, height);
+            histCtx.fillStyle = 'rgba(255, 251, 245, 0.96)';
+            histCtx.fillRect(0, 0, width, height);
+
+            const samples = state.samples.slice(-600).map((sample) => sample.x);
+            if (samples.length < 8) return;
+
+            const bins = 28;
+            const min = -5;
+            const max = 5;
+            const counts = new Array(bins).fill(0);
+            samples.forEach((value) => {
+                const idx = Math.floor(((value - min) / (max - min)) * bins);
+                if (idx >= 0 && idx < bins) counts[idx] += 1;
+            });
+            const maxCount = Math.max(...counts, 1);
+            const pad = 18;
+            const barWidth = (width - pad * 2) / bins;
+
+            histCtx.strokeStyle = 'rgba(77, 62, 44, 0.12)';
+            histCtx.beginPath();
+            histCtx.moveTo(pad, height - pad);
+            histCtx.lineTo(width - pad, height - pad);
+            histCtx.stroke();
+
+            counts.forEach((count, index) => {
+                const barHeight = (count / maxCount) * (height - pad * 2);
+                const x = pad + index * barWidth;
+                const y = height - pad - barHeight;
+                histCtx.fillStyle = `rgba(203, 90, 46, ${0.2 + count / maxCount * 0.7})`;
+                histCtx.fillRect(x, y, barWidth - 1, barHeight);
+            });
+        }
+
+        function drawAcf() {
+            resizeCanvasToDisplay(acfCanvas, 160);
+            const { width, height } = acfCanvas;
+            acfCtx.clearRect(0, 0, width, height);
+            acfCtx.fillStyle = 'rgba(255, 251, 245, 0.96)';
+            acfCtx.fillRect(0, 0, width, height);
+
+            const samples = state.samples.slice(-320).map((sample) => sample.x);
+            if (samples.length < 12) return;
+
+            const pad = 18;
+            const lags = 16;
+            acfCtx.strokeStyle = 'rgba(77, 62, 44, 0.12)';
+            acfCtx.beginPath();
+            acfCtx.moveTo(pad, height - pad);
+            acfCtx.lineTo(width - pad, height - pad);
+            acfCtx.moveTo(pad, pad);
+            acfCtx.lineTo(pad, height - pad);
+            acfCtx.stroke();
+
+            for (let lag = 1; lag <= lags; lag++) {
+                const rho = clamp(lagAutocorrelation(samples, lag), -1, 1);
+                const x = pad + (lag / (lags + 1)) * (width - pad * 2);
+                const y0 = height - pad;
+                const y1 = y0 - ((rho + 1) / 2) * (height - pad * 2);
+                acfCtx.strokeStyle = rho >= 0 ? '#125b50' : '#cf4f5d';
+                acfCtx.lineWidth = 4;
+                acfCtx.beginPath();
+                acfCtx.moveTo(x, y0);
+                acfCtx.lineTo(x, y1);
+                acfCtx.stroke();
+            }
+        }
+
+        function renderAll() {
+            renderMainCanvas();
+            drawTrace();
+            drawHistogram();
+            drawAcf();
+            updateStats();
+        }
+
+        function syncControls() {
+            const controls = [
+                ['separationSlider', state.params.separation, 1],
+                ['corrSlider', state.params.correlation, 2],
+                ['ridgeSlider', state.params.ridgeSharpness, 2],
+                ['stepSlider', state.params.proposalScale, 2],
+                ['gibbsNoiseSlider', state.params.gibbsNoise, 2],
+                ['independenceCenterSlider', state.params.independenceCenter, 2],
+                ['particlesSlider', state.params.particleCount, 0],
+                ['resampleSlider', state.params.resampleThreshold, 2]
+            ];
+            controls.forEach(([id, value, digits]) => {
+                const input = document.getElementById(id);
+                if (input) input.value = String(value);
+                const output = document.getElementById(id.replace('Slider', 'Value'));
+                if (output) output.textContent = Number(value).toFixed(digits);
+            });
+        }
+
+        function animationFrame(timestamp) {
+            if (!state.running && !state.pendingTransition) return;
+            if (!state.lastTime) state.lastTime = timestamp;
+            const delta = timestamp - state.lastTime;
+            state.lastTime = timestamp;
+            state.accumulator += delta;
+            const stepInterval = 1000 / state.speed;
+
+            if (state.pendingTransition) {
+                state.pendingTransition.elapsed += delta;
+                if (state.pendingTransition.phase === 'proposal' && state.pendingTransition.elapsed >= state.pendingTransition.proposalDuration) {
+                    state.pendingTransition.phase = 'decision';
+                    state.pendingTransition.elapsed = 0;
+                } else if (state.pendingTransition.phase === 'decision' && state.pendingTransition.elapsed >= state.pendingTransition.decisionDuration) {
+                    if (state.pendingTransition.accepted) {
+                        state.pendingTransition.phase = 'move';
+                        state.pendingTransition.elapsed = 0;
+                        state.pendingTransition.moveElapsed = 0;
+                    } else {
+                        finalizeProposalTransition(state.pendingTransition);
+                        state.pendingTransition = null;
+                        updateNarrative();
+                        updateStats();
+                    }
+                } else if (state.pendingTransition.phase === 'move') {
+                    state.pendingTransition.moveElapsed = (state.pendingTransition.moveElapsed || 0) + delta;
+                    if (state.pendingTransition.moveElapsed >= state.pendingTransition.moveDuration) {
+                        finalizeProposalTransition(state.pendingTransition);
+                        state.pendingTransition = null;
+                        updateNarrative();
+                        updateStats();
+                    }
+                }
+            } else {
+                let safety = 0;
+                while (state.accumulator >= stepInterval && safety < 40) {
+                    if (state.algo === 'mh' || state.algo === 'independence') {
+                        beginProposalTransition(stepInterval);
+                        state.accumulator -= stepInterval;
+                        break;
+                    }
+                    runOneStep();
+                    state.accumulator -= stepInterval;
+                    safety += 1;
+                }
+            }
+
+            if (!state.running && state.pendingTransition) {
+                state.accumulator = 0;
+            }
+            renderAll();
+            if (state.running || state.pendingTransition) requestAnimationFrame(animationFrame);
+        }
+
+        function toggleRunning() {
+            state.running = !state.running;
+            ui.playBtn.textContent = state.running ? 'Pause Chain' : 'Start Chain';
+            state.lastTime = 0;
+            if (state.running) requestAnimationFrame(animationFrame);
+        }
+
+        function bindEvents() {
+            document.querySelectorAll('.algo-btn').forEach((button) => {
+                button.addEventListener('click', () => setAlgo(button.dataset.algo));
+            });
+
+            document.querySelectorAll('.preset-btn').forEach((button) => {
+                button.addEventListener('click', () => applyPreset(button.dataset.preset));
+            });
+
+            document.querySelectorAll('.chip').forEach((button) => {
+                button.addEventListener('click', () => {
+                    state.speed = Number(button.dataset.speed);
+                    document.querySelectorAll('.chip').forEach((node) => node.classList.toggle('active', node === button));
+                });
+            });
+
+            ui.playBtn.addEventListener('click', toggleRunning);
+            ui.stepBtn.addEventListener('click', () => {
+                if (state.running) toggleRunning();
+                runOneStep();
+            });
+            ui.resetBtn.addEventListener('click', () => {
+                state.running = false;
+                ui.playBtn.textContent = 'Start Chain';
+                resetChain();
+            });
+
+            document.getElementById('separationSlider').addEventListener('input', (event) => {
+                state.params.separation = Number(event.target.value);
+                document.getElementById('separationValue').textContent = state.params.separation.toFixed(1);
+                resetChain();
+            });
+
+            document.getElementById('corrSlider').addEventListener('input', (event) => {
+                state.params.correlation = Number(event.target.value);
+                document.getElementById('corrValue').textContent = state.params.correlation.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('ridgeSlider').addEventListener('input', (event) => {
+                state.params.ridgeSharpness = Number(event.target.value);
+                document.getElementById('ridgeValue').textContent = state.params.ridgeSharpness.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('stepSlider').addEventListener('input', (event) => {
+                state.params.proposalScale = Number(event.target.value);
+                document.getElementById('stepValue').textContent = state.params.proposalScale.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('gibbsNoiseSlider').addEventListener('input', (event) => {
+                state.params.gibbsNoise = Number(event.target.value);
+                document.getElementById('gibbsNoiseValue').textContent = state.params.gibbsNoise.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('independenceCenterSlider').addEventListener('input', (event) => {
+                state.params.independenceCenter = Number(event.target.value);
+                document.getElementById('independenceCenterValue').textContent = state.params.independenceCenter.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('particlesSlider').addEventListener('input', (event) => {
+                state.params.particleCount = Number(event.target.value);
+                document.getElementById('particlesValue').textContent = String(state.params.particleCount);
+                resetChain();
+            });
+
+            document.getElementById('resampleSlider').addEventListener('input', (event) => {
+                state.params.resampleThreshold = Number(event.target.value);
+                document.getElementById('resampleValue').textContent = state.params.resampleThreshold.toFixed(2);
+                resetChain();
+            });
+
+            document.getElementById('targetToggle').addEventListener('click', (event) => {
+                state.toggles.showTarget = !state.toggles.showTarget;
+                event.currentTarget.classList.toggle('active', state.toggles.showTarget);
+                renderAll();
+            });
+
+            document.getElementById('trailToggle').addEventListener('click', (event) => {
+                state.toggles.showTrail = !state.toggles.showTrail;
+                event.currentTarget.classList.toggle('active', state.toggles.showTrail);
+                renderAll();
+            });
+
+            document.getElementById('proposalToggle').addEventListener('click', (event) => {
+                state.toggles.showProposal = !state.toggles.showProposal;
+                event.currentTarget.classList.toggle('active', state.toggles.showProposal);
+                renderAll();
+            });
+
+            window.addEventListener('resize', renderAll);
+        }
+
+        bindEvents();
+        syncControls();
+        setAlgo('mh');
+    </script>
+</body>
+</html>
